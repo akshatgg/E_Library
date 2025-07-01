@@ -1,6 +1,7 @@
 "use client"
+import { auth,getUserDataFromFirestore  } from "@/lib/firebase";
 
-import { useEffect } from "react"
+import { useEffect,useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -25,10 +26,17 @@ import {
 import Link from "next/link"
 import { useAuth } from "@/components/auth-provider"
 import { useTheme } from "next-themes"
+import { set } from "date-fns";
 
 export default function HomePage() {
   const { user, isAuthenticated, isLoading, signOut } = useAuth()
   const { theme, setTheme } = useTheme()
+  type UserData = {
+    displayName?: string;
+    // Add other properties if needed
+    [key: string]: any;
+  };
+  const [userData, setUserData] = useState<UserData | null>(null);
   const router = useRouter()
 
   useEffect(() => {
@@ -36,6 +44,19 @@ export default function HomePage() {
       router.push("/auth/signin")
     }
   }, [isAuthenticated, isLoading, router])
+  
+
+useEffect(() => {
+  const loadUserData = async () => {
+    if (auth.currentUser) {
+      const userData = await getUserDataFromFirestore(auth.currentUser.uid);
+      console.log("User Data:", userData);
+      setUserData(userData);
+    }
+  };
+
+  loadUserData();
+}, []);
 
   if (isLoading) {
     return (
@@ -68,10 +89,14 @@ export default function HomePage() {
             </div>
 
             <div className="flex items-center space-x-4">
-              <Badge variant="secondary" className="hidden sm:flex">
-                <User className="w-3 h-3 mr-1" />
-                {user?.name}
-              </Badge>
+             <Badge
+      variant="secondary"
+      className="hidden sm:flex items-center group cursor-pointer"
+      onClick={() => router.push("/dashboard")}
+    >
+      <User className="w-3 h-3 mr-1" />
+      {userData?.displayName}
+    </Badge>
 
               <Button variant="outline" size="sm" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
                 {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
