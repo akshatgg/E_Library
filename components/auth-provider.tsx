@@ -118,7 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Sign out immediately after registration to prevent access before verification
     await firebaseSignOut(auth)
-    await removeCookies("token")
+    removeCookies("token")
 
     setUser(null)
     throw new Error("Verification email sent. Please check your inbox and verify your email.")

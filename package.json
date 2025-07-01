@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@auth/core": "latest",
-    "@hookform/resolvers": "latest",
+    "@hookform/resolvers": "^5.1.1",
     "@iconify/react": "latest",
     "@radix-ui/react-accordion": "latest",
     "@radix-ui/react-alert-dialog": "latest",
@@ -68,7 +68,7 @@
     "react-day-picker": "latest",
     "react-dom": "^18",
     "react-dropzone": "latest",
-    "react-hook-form": "latest",
+    "react-hook-form": "^7.59.0",
     "react-pdf": "latest",
     "react-resizable-panels": "latest",
     "react-toastify": "latest",
@@ -81,7 +81,7 @@
     "use-sync-external-store": "latest",
     "uuid": "latest",
     "vaul": "latest",
-    "zod": "latest",
+    "zod": "^3.25.67",
     "zustand": "latest"
   },
   "devDependencies": {

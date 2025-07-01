@@ -1,9 +1,11 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
+import React, { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { useForm } from "react-hook-form"
+import { z } from "zod"
+import { zodResolver } from "@hookform/resolvers/zod"
+
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -13,14 +15,39 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { BookOpen, Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react"
 import { useAuthContext } from "@/components/auth-provider"
 
+// Zod Schemas
+const SignInSchema = z.object({
+  email: z.string().email("Invalid email"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+})
+
+const SignUpSchema = SignInSchema.extend({
+  displayName: z.string().min(2, "Name must be at least 2 characters"),
+})
+
+type SignInForm = z.infer<typeof SignInSchema>
+type SignUpForm = z.infer<typeof SignUpSchema>
+
 export default function SignInPage() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [displayName, setDisplayName] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
-  const [error, setError] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState("signin")
+  const [error, setError] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+
+  const {
+    register: signInRegister,
+    handleSubmit: handleSignInSubmit,
+    formState: { errors: signInErrors, isSubmitting: isSigningIn },
+  } = useForm<SignInForm>({
+    resolver: zodResolver(SignInSchema),
+  })
+
+  const {
+    register: signUpRegister,
+    handleSubmit: handleSignUpSubmit,
+    formState: { errors: signUpErrors, isSubmitting: isSigningUp },
+  } = useForm<SignUpForm>({
+    resolver: zodResolver(SignUpSchema),
+  })
 
   const { signIn, signUp, isAuthenticated } = useAuthContext()
   const router = useRouter()
@@ -31,33 +58,23 @@ export default function SignInPage() {
     }
   }, [isAuthenticated, router])
 
-  const handleEmailSignIn = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
+  const handleEmailSignIn = async (data: SignInForm) => {
     setError("")
-
     try {
-      await signIn(email, password)
+      await signIn(data.email, data.password)
       router.push("/")
-    } catch (error: any) {
-      setError(error.message)
-    } finally {
-      setIsLoading(false)
+    } catch (err: any) {
+      setError(err.message)
     }
   }
 
-  const handleEmailSignUp = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
+  const handleEmailSignUp = async (data: SignUpForm) => {
     setError("")
-
     try {
-      await signUp(email, password, displayName)
+      await signUp(data.email, data.password, data.displayName)
       router.push("/")
-    } catch (error: any) {
-      setError(error.message)
-    } finally {
-      setIsLoading(false)
+    } catch (err: any) {
+      setError(err.message)
     }
   }
 
@@ -81,23 +98,22 @@ export default function SignInPage() {
           <p className="text-gray-600 dark:text-gray-400 mt-2">Access your legal research platform</p>
         </div>
 
-        {/* Authentication Card */}
+        {/* Auth Card */}
         <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg border-white/20 dark:border-gray-700/20 shadow-xl">
           <CardHeader>
             <CardTitle className="text-center">Sign In to Continue</CardTitle>
             <CardDescription className="text-center">Access your account</CardDescription>
           </CardHeader>
           <CardContent>
-            {/* Tabs for different auth methods */}
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="signin">Sign In</TabsTrigger>
                 <TabsTrigger value="signup">Sign Up</TabsTrigger>
               </TabsList>
 
-              {/* Email Sign In */}
+              {/* Sign In */}
               <TabsContent value="signin">
-                <form onSubmit={handleEmailSignIn} className="space-y-4">
+                <form onSubmit={handleSignInSubmit(handleEmailSignIn)} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="signin-email">Email</Label>
                     <div className="relative">
@@ -106,12 +122,11 @@ export default function SignInPage() {
                         id="signin-email"
                         type="email"
                         placeholder="Enter your email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
                         className="pl-10"
-                        required
+                        {...signInRegister("email")}
                       />
                     </div>
+                    {signInErrors.email && <p className="text-red-500 text-sm">{signInErrors.email.message}</p>}
                   </div>
 
                   <div className="space-y-2">
@@ -122,10 +137,8 @@ export default function SignInPage() {
                         id="signin-password"
                         type={showPassword ? "text" : "password"}
                         placeholder="Enter your password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
                         className="pl-10 pr-10"
-                        required
+                        {...signInRegister("password")}
                       />
                       <Button
                         type="button"
@@ -137,10 +150,11 @@ export default function SignInPage() {
                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </Button>
                     </div>
+                    {signInErrors.password && <p className="text-red-500 text-sm">{signInErrors.password.message}</p>}
                   </div>
 
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? (
+                  <Button type="submit" className="w-full" disabled={isSigningIn}>
+                    {isSigningIn ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Signing in...
@@ -152,19 +166,20 @@ export default function SignInPage() {
                 </form>
               </TabsContent>
 
-              {/* Email Sign Up */}
+              {/* Sign Up */}
               <TabsContent value="signup">
-                <form onSubmit={handleEmailSignUp} className="space-y-4">
+                <form onSubmit={handleSignUpSubmit(handleEmailSignUp)} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="signup-name">Full Name</Label>
                     <Input
                       id="signup-name"
                       type="text"
                       placeholder="Enter your full name"
-                      value={displayName}
-                      onChange={(e) => setDisplayName(e.target.value)}
-                      required
+                      {...signUpRegister("displayName")}
                     />
+                    {signUpErrors.displayName && (
+                      <p className="text-red-500 text-sm">{signUpErrors.displayName.message}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -175,12 +190,11 @@ export default function SignInPage() {
                         id="signup-email"
                         type="email"
                         placeholder="Enter your email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
                         className="pl-10"
-                        required
+                        {...signUpRegister("email")}
                       />
                     </div>
+                    {signUpErrors.email && <p className="text-red-500 text-sm">{signUpErrors.email.message}</p>}
                   </div>
 
                   <div className="space-y-2">
@@ -191,10 +205,8 @@ export default function SignInPage() {
                         id="signup-password"
                         type={showPassword ? "text" : "password"}
                         placeholder="Create a password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
                         className="pl-10 pr-10"
-                        required
+                        {...signUpRegister("password")}
                       />
                       <Button
                         type="button"
@@ -206,10 +218,11 @@ export default function SignInPage() {
                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </Button>
                     </div>
+                    {signUpErrors.password && <p className="text-red-500 text-sm">{signUpErrors.password.message}</p>}
                   </div>
 
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? (
+                  <Button type="submit" className="w-full" disabled={isSigningUp}>
+                    {isSigningUp ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Creating account...
@@ -230,7 +243,6 @@ export default function SignInPage() {
           </CardContent>
         </Card>
 
-        {/* Footer */}
         <div className="text-center mt-8 text-sm text-gray-500 dark:text-gray-400">
           <p>© 2024 iTax Easy Private Limited. All rights reserved.</p>
         </div>
