@@ -1,4 +1,4 @@
-"use client";
+"use client"
 
 import React, { createContext, useContext, useEffect, useState } from "react"
 import { setCookies, removeCookies } from "cookies-next"
@@ -8,6 +8,7 @@ import {
   onAuthStateChanged,
   signOut as firebaseSignOut,
   getIdToken,
+  sendEmailVerification,
 } from "firebase/auth"
 import { doc, setDoc, getDoc } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase"
@@ -40,26 +41,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        const token = await getIdToken(firebaseUser)
-        setCookies("token", token, { maxAge: 60 * 60 * 24 })
+      try {
+        if (firebaseUser && firebaseUser.emailVerified) {
+          const token = await getIdToken(firebaseUser)
+          setCookies("token", token, { maxAge: 60 * 60 * 24 })
 
-        const docSnap = await getDoc(doc(db, "users", firebaseUser.uid))
-        if (docSnap.exists()) {
-          setUser(docSnap.data() as User)
+          const userRef = doc(db, "users", firebaseUser.uid)
+          const docSnap = await getDoc(userRef)
+
+          if (docSnap.exists()) {
+            setUser(docSnap.data() as User)
+          } else {
+            const newUser: User = {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email || "",
+              displayName: firebaseUser.displayName || "",
+              credits: 0,
+            }
+            await setDoc(userRef, newUser)
+            setUser(newUser)
+          }
         } else {
-          setUser({
-            uid: firebaseUser.uid,
-            email: firebaseUser.email || "",
-            displayName: firebaseUser.displayName || "",
-            credits: 0,
-          })
+          await removeCookies("token")
+          setUser(null)
         }
-      } else {
-        removeCookies("token")
+      } catch (err: any) {
+        setError(err)
         setUser(null)
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     })
 
     return () => unsubscribe()
@@ -67,12 +78,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     const res = await signInWithEmailAndPassword(auth, email, password)
+
+    if (!res.user.emailVerified) {
+      await firebaseSignOut(auth)
+      throw new Error("Please verify your email before signing in.")
+    }
+
     const token = await getIdToken(res.user)
     setCookies("token", token, { maxAge: 60 * 60 * 24 })
 
     const docSnap = await getDoc(doc(db, "users", res.user.uid))
     if (docSnap.exists()) {
       setUser(docSnap.data() as User)
+    } else {
+      const newUser: User = {
+        uid: res.user.uid,
+        email: res.user.email || "",
+        displayName: res.user.displayName || "",
+        credits: 0,
+      }
+      await setDoc(doc(db, "users", res.user.uid), newUser)
+      setUser(newUser)
     }
   }
 
@@ -88,11 +114,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     await setDoc(doc(db, "users", uid), userData)
+    await sendEmailVerification(res.user)
 
-    const token = await getIdToken(res.user)
-    setCookies("token", token, { maxAge: 60 * 60 * 24 })
+    // Sign out immediately after registration to prevent access before verification
+    await firebaseSignOut(auth)
+    await removeCookies("token")
 
-    setUser(userData)
+    setUser(null)
+    throw new Error("Verification email sent. Please check your inbox and verify your email.")
   }
 
   const signOut = async () => {
