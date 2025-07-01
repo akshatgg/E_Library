@@ -18,6 +18,9 @@ export interface User {
   email: string
   displayName: string
   credits?: number
+  createdAt: Date
+  lastLogin: Date
+  role: "admin" | "user"
 }
 
 interface AuthContextType {
@@ -57,6 +60,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               email: firebaseUser.email || "",
               displayName: firebaseUser.displayName || "",
               credits: 0,
+              role: "user",
+        
+          createdAt: new Date(),
+          lastLogin: new Date(),
+
             }
             await setDoc(userRef, newUser)
             setUser(newUser)
@@ -96,6 +104,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: res.user.email || "",
         displayName: res.user.displayName || "",
         credits: 0,
+        role: "user",
+        createdAt: new Date(),
+        lastLogin: new Date(),
       }
       await setDoc(doc(db, "users", res.user.uid), newUser)
       setUser(newUser)
@@ -111,6 +122,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email,
       displayName,
       credits: 0,
+      role: "user",
+      createdAt: new Date(),
+      lastLogin: new Date(),
     }
 
     await setDoc(doc(db, "users", uid), userData)

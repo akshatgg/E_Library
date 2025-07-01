@@ -90,7 +90,8 @@ export default function ProfilePage() {
                       </div>
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Last Login</p>
-                        <p>{user.lastLogin.toLocaleString()}</p>
+<p>{user.lastLogin.toDate().toLocaleString()}</p>
+
                       </div>
                     </div>
                   </CardContent>
