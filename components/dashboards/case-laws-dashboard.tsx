@@ -160,7 +160,7 @@ const startPage = Math.floor((currentPage - 1) / maxButtons) * maxButtons + 1;
 useEffect(() => {
   const loadData = async () => {
     try {
-      const res = await fetch(`http://localhost:4000/api/case-laws?pagenum=${currentPage - 1}`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/case-laws?pagenum=${currentPage - 1}`);
       const json = await res.json();
 
       if (!json.success || !Array.isArray(json.data)) {
