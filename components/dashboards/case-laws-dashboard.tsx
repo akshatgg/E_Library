@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { fetchIndianKanoonData } from "@/lib/kanoon-api";
 import {
   Select,
   SelectContent,
@@ -49,6 +50,7 @@ interface CaseData {
   pdfUrl?: string;
 }
 
+ 
 const mockCases: CaseData[] = [
   {
     id: "1",
@@ -143,6 +145,66 @@ export function CaseLawsDashboard() {
   const [selectedOutcome, setSelectedOutcome] = useState<string>("all");
   const [selectedYear, setSelectedYear] = useState<string>("all");
   const [selectedSection, setSelectedSection] = useState<string>("all");
+
+
+
+
+const [currentPage, setCurrentPage] = useState(1);
+const [totalPages, setTotalPages] = useState(1); // will increase dynamically
+const [lastPageReached, setLastPageReached] = useState(false);
+
+const maxButtons = 10;
+const startPage = Math.floor((currentPage - 1) / maxButtons) * maxButtons + 1;
+
+
+useEffect(() => {
+  const loadData = async () => {
+    try {
+      const res = await fetch(`http://localhost:4000/api/case-laws?pagenum=${currentPage - 1}`);
+      const json = await res.json();
+
+      if (!json.success || !Array.isArray(json.data)) {
+        console.error("Invalid API response format", json);
+        return;
+      }
+
+      const mappedCases = json.data.map((item: any, idx: number) => {
+        const cleanHeadline = item.headline?.replace(/<[^>]+>/g, "") ?? "";
+        return {
+          id: item.tid?.toString() ?? String(idx),
+          title: item.title ?? "Untitled",
+          court: item.docsource ?? "Unknown",
+          date: item.publishdate ?? "",
+          category: item.docsource?.toLowerCase().includes("itat") ? "ITAT" : "Other",
+          outcome: "allowed",
+          parties: {
+            appellant: "",
+            respondent: "",
+          },
+          caseNumber: `${item.tid}`,
+          summary: cleanHeadline,
+          relevantSections: [],
+          keywords: [],
+          legalPoints: [],
+          url: `https://indiankanoon.org/doc/${item.tid}`,
+          pdfUrl: undefined,
+        };
+      });
+
+      setCases(mappedCases);
+
+      // You can set totalPages here if API provides it
+      setTotalPages(10); // example: hardcoded for now
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    }
+  };
+
+  loadData();
+}, [currentPage]); // 👈 Triggers whenever page changes
+
+
+
 
   useEffect(() => {
     filterCases();
@@ -249,6 +311,9 @@ export function CaseLawsDashboard() {
     );
   };
 
+
+
+   
   const stats = [
     {
       label: "Total Cases",
@@ -977,7 +1042,41 @@ export function CaseLawsDashboard() {
             </div>
           </TabsContent>
         </Tabs>
+
       </main>
+
+
+<div className="flex justify-between items-center mt-4">
+  <span className="text-sm text-gray-600">Showing page {currentPage}</span>
+
+  <nav className="inline-flex space-x-2">
+    <button
+      onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+      className="px-3 py-1 border rounded disabled:opacity-50"
+      disabled={currentPage === 1}
+    >
+      Previous
+    </button>
+
+  <span className="px-4 py-1 border rounded font-semibold text-blue-700 bg-gray-100">
+    {currentPage}
+  </span>
+
+    <button
+      onClick={() => setCurrentPage((prev) => prev + 1)}
+      className="px-3 py-1 border rounded disabled:opacity-50"
+      disabled={lastPageReached}
+    >
+      Next
+    </button>
+  </nav>
+</div>
+
+
+
+
+
+
     </div>
   );
 }

@@ -1,7 +1,7 @@
 // indiankanoonAPI.ts
 import axios from "axios";
 
-const INDIAN_KANOON_TOKEN = "1aa778133ee38ba5f0b461e825d90b433a14dbe7";
+const INDIAN_KANOON_TOKEN = "d58940b08012f775f02a5f61063222a844ad3e24";
 const INDIAN_KANOON_ENDPOINT = "https://api.indiankanoon.org";
 
 export interface IKanoonResult {
@@ -14,16 +14,23 @@ export interface IKanoonResult {
   docsize: number;
 }
 
-export async function fetchIndianKanoonData(pageNum: number): Promise<IKanoonResult[]> {
+interface FetchKanoonProps {
+  formInput?: string;
+  pagenum?: number;
+}
+
+export async function fetchIndianKanoonData(props: FetchKanoonProps = {}): Promise<IKanoonResult[]> {
   try {
-    const formInput =
-      "income tax act ORR gst act ORR itr filing ORR section 139 ORR section 143 ORR section 147 ORR section 148 doctypes:highcourts,supremecourt,tribunals,laws,judgments";
+    const {
+      formInput = "(income tax OR income-tax act OR income tax return OR gst OR g.s.t OR gst act OR section 139 of income tax act OR section 143 of income tax act OR section 147 of income tax act OR section 148 of income tax act)",
+      pagenum = 0,
+    } = props;
 
     const response = await axios.post(
-      `INDIAN_KANOON_ENDPOINT/search`,
+      `${INDIAN_KANOON_ENDPOINT}/search/`,
       new URLSearchParams({
         formInput,
-        pagenum: pageNum.toString(),
+        pagenum: pagenum.toString(),
       }),
       {
         headers: {
@@ -39,6 +46,8 @@ export async function fetchIndianKanoonData(pageNum: number): Promise<IKanoonRes
     return [];
   }
 }
+
+
 export async function fetchIndianKanoonTotalPages(): Promise<number> {
   try {
     const response = await axios.get(`${INDIAN_KANOON_ENDPOINT}total_pages/`, {
@@ -54,6 +63,8 @@ export async function fetchIndianKanoonTotalPages(): Promise<number> {
     return 0;
   }
 }
+
+
 export async function fetchCaseByTid(tid: number): Promise<any> {
 
   try {
