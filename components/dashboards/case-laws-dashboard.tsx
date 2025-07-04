@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { fetchIndianKanoonData } from "@/lib/kanoon-api";
+
 import {
   Select,
   SelectContent,
@@ -27,6 +27,7 @@ import {
   TrendingUp,
   Building,
   Gavel,
+  FormInput,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -156,11 +157,44 @@ const [lastPageReached, setLastPageReached] = useState(false);
 const maxButtons = 10;
 const startPage = Math.floor((currentPage - 1) / maxButtons) * maxButtons + 1;
 
+const getFormInputByCategory = (category: string): string => {
+  switch (category) {
+    case "ITAT":
+      return "(income tax appellate tribunal OR ITAT OR section 253 of income tax act OR section 254 of income tax act)";
+    case "GST":
+      return "(GST OR g.s.t OR goods and services tax OR CESTAT OR gst act)";
+    case "INCOME_TAX":
+      return "(income tax OR income-tax act OR income tax return OR section 139 OR section 143 OR section 147)";
+    case "HIGH_COURT":
+      return "(high court judgment OR high court order)";
+    case "SUPREME_COURT":
+      return "(supreme court judgment OR supreme court order)";
+    case "TRIBUNAL":
+      return "(tribunal OR appellate authority)";
+    case "all":
+    default:
+      return "(income tax OR income-tax act OR income tax return OR gst OR g.s.t OR gst act OR section 139 of income tax act OR section 143 of income tax act OR section 147 of income tax act OR section 148 of income tax act OR section 61 of gst act OR section 62 of gst act OR section 63 of gst act OR section 64 of gst act OR section 65 of gst act OR section 66 of gst act OR section 67 of gst act OR section 68 of gst act OR section 69 of gst act OR section 70 of gst act OR section 71 of gst act OR section 72 of gst act OR section 73 of gst act OR section 74 of gst act OR section 75 of gst act OR section 76 of gst act OR section 77 of gst act OR section 78 of gst act)";
+  }
+};
+
+const mapDocSourceToCategory = (docsource:string) => {
+  const source = docsource?.toLowerCase() || "";
+  if (source.includes('itat')) return 'ITAT';
+  if (source.includes('gst') || source.includes('cestat')) return 'GST';
+  if (source.includes('income tax') || source.includes('income-tax')) return 'INCOME_TAX';
+  if (source.includes('high court')) return 'HIGH_COURT';
+  if (source.includes('supreme court')) return 'SUPREME_COURT';
+  return 'OTHER';
+};
 
 useEffect(() => {
   const loadData = async () => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/case-laws?pagenum=${currentPage - 1}`);
+      const formInput = encodeURIComponent(getFormInputByCategory(selectedCategory));
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/case-laws?pagenum=${currentPage - 1}&formInput=${formInput}`
+      );
+
       const json = await res.json();
 
       if (!json.success || !Array.isArray(json.data)) {
@@ -173,10 +207,10 @@ useEffect(() => {
         const cleanTitle = item.title?.replace(/<[^>]+>/g, "") ?? "";
         return {
           id: item.tid?.toString() ?? String(idx),
-          title: cleanTitle ?? "Untitled",
+          title: cleanTitle,
           court: item.docsource ?? "Unknown",
           date: item.publishdate ?? "",
-          category: item.docsource?.toLowerCase().includes("itat") ? "ITAT" : "Other",
+         category: mapDocSourceToCategory(item.docsource ?? ""),
           outcome: "allowed",
           parties: {
             appellant: "",
@@ -188,21 +222,18 @@ useEffect(() => {
           keywords: [],
           legalPoints: [],
           url: `https://indiankanoon.org/doc/${item.tid}`,
-          pdfUrl: undefined,
         };
       });
 
       setCases(mappedCases);
-
-      // You can set totalPages here if API provides it
-      setTotalPages(10); // example: hardcoded for now
+      setTotalPages(10); // Adjust if dynamic totalPages available
     } catch (error) {
       console.error("Error fetching data:", error);
     }
   };
 
   loadData();
-}, [currentPage]); // 👈 Triggers whenever page changes
+}, [currentPage, selectedCategory]);
 
 
 
@@ -237,11 +268,11 @@ useEffect(() => {
       );
     }
 
-    if (selectedCategory !== "all") {
-      filtered = filtered.filter(
-        (caseItem) => caseItem.category === selectedCategory
-      );
-    }
+    // if (selectedCategory !== "all") {
+    //   filtered = filtered.filter(
+    //     (caseItem) => caseItem.category === selectedCategory
+    //   );
+    // }
 
     if (selectedCourt !== "all") {
       filtered = filtered.filter((caseItem) =>
@@ -331,6 +362,7 @@ useEffect(() => {
     {
       label: "GST Cases",
       value: cases.filter((c) => c.category === "GST").length,
+      
       icon: TrendingUp,
       color: "text-purple-600",
     },
@@ -815,15 +847,16 @@ useEffect(() => {
                           {/* Tags */}
                           <td className="border border-gray-300 px-4 py-3 align-top">
                             <div className="space-y-2">
-                              <div>
-                                <Badge
-                                  className={getCategoryColor(
-                                    caseItem.category
-                                  )}
-                                >
-                                  {caseItem.category}
-                                </Badge>
-                              </div>
+                              <div className="space-y-1">
+  <Badge className={getCategoryColor(caseItem.category)}>
+    {caseItem.category}
+  </Badge>
+  {selectedCategory !== "all" && (
+    <Badge className="bg-blue-100 text-blue-800">
+      {selectedCategory}
+    </Badge>
+  )}
+</div>
                               {caseItem.keywords.length > 0 && (
                                 <div className="flex flex-wrap gap-1">
                                   {caseItem.keywords

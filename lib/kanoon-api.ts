@@ -17,25 +17,32 @@ export interface IKanoonResult {
 interface FetchKanoonProps {
   formInput?: string;
   pagenum?: number;
+  year?: number; // ✅ optional year filter (like 2019)
 }
 
 export async function fetchIndianKanoonData(props: FetchKanoonProps = {}): Promise<IKanoonResult[]> {
   try {
     const {
-      formInput = "(income tax OR income-tax act OR income tax return OR gst OR g.s.t OR gst act OR section 139 of income tax act OR section 143 of income tax act OR section 147 of income tax act OR section 148 of income tax act OR section 61 of gst act OR section 62 of gst act OR section 63 of gst act OR section 64 of gst act OR section 65 of gst act OR section 66 of gst act OR section 67 of gst act OR section 68 of gst act OR section 69 of gst act OR section 70 of gst act OR section 71 of gst act OR section 72 of gst act OR section 73 of gst act OR section 74 of gst act OR section 75 of gst act OR section 76 of gst act OR section 77 of gst act OR section 78 of gst act)",
+      formInput = "(income tax appellate tribunal OR ITAT OR income-tax appellate tribunal OR income tax appellate court)",
       pagenum = 0,
+      year, // ✅ capture year from props
     } = props;
+ 
+    // ✅ Append year to formInput if provided
+    const finalQuery = year ? `${formInput} ${year}` : formInput;
+
+    const params = new URLSearchParams();
+    params.append("formInput", finalQuery);
+    params.append("pagenum", pagenum.toString());
 
     const response = await axios.post(
-      `${INDIAN_KANOON_ENDPOINT}/search/`,
-      new URLSearchParams({
-        formInput,
-        pagenum: pagenum.toString(),
-      }),
+      `https://api.indiankanoon.org/search/`,
+      params,
       {
         headers: {
-          Authorization: `Token ${INDIAN_KANOON_TOKEN}`,
+          Authorization: `Token d58940b08012f775f02a5f61063222a844ad3e24`,
           Accept: "application/json",
+          "Content-Type": "application/x-www-form-urlencoded",
         },
       }
     );
@@ -46,6 +53,7 @@ export async function fetchIndianKanoonData(props: FetchKanoonProps = {}): Promi
     return [];
   }
 }
+
 
 
 export async function fetchIndianKanoonTotalPages(): Promise<number> {
