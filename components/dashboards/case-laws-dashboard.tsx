@@ -170,9 +170,10 @@ useEffect(() => {
 
       const mappedCases = json.data.map((item: any, idx: number) => {
         const cleanHeadline = item.headline?.replace(/<[^>]+>/g, "") ?? "";
+        const cleanTitle = item.title?.replace(/<[^>]+>/g, "") ?? "";
         return {
           id: item.tid?.toString() ?? String(idx),
-          title: item.title ?? "Untitled",
+          title: cleanTitle ?? "Untitled",
           court: item.docsource ?? "Unknown",
           date: item.publishdate ?? "",
           category: item.docsource?.toLowerCase().includes("itat") ? "ITAT" : "Other",
