@@ -30,6 +30,7 @@ import {
   FormInput,
 } from "lucide-react";
 import { toast } from "sonner";
+import { el } from "date-fns/locale";
 
 interface CaseData {
   id: string;
@@ -158,6 +159,7 @@ const maxButtons = 10;
 const startPage = Math.floor((currentPage - 1) / maxButtons) * maxButtons + 1;
 
 const getFormInputByCategory = (category: string): string => {
+  if(!selectedYear){
   switch (category) {
     case "ITAT":
       return "(income tax appellate tribunal OR ITAT OR section 253 of income tax act OR section 254 of income tax act)";
@@ -175,7 +177,29 @@ const getFormInputByCategory = (category: string): string => {
     default:
       return "(income tax OR income-tax act OR income tax return OR gst OR g.s.t OR gst act OR section 139 of income tax act OR section 143 of income tax act OR section 147 of income tax act OR section 148 of income tax act OR section 61 of gst act OR section 62 of gst act OR section 63 of gst act OR section 64 of gst act OR section 65 of gst act OR section 66 of gst act OR section 67 of gst act OR section 68 of gst act OR section 69 of gst act OR section 70 of gst act OR section 71 of gst act OR section 72 of gst act OR section 73 of gst act OR section 74 of gst act OR section 75 of gst act OR section 76 of gst act OR section 77 of gst act OR section 78 of gst act)";
   }
+}
+else{
+
+  switch (category) {
+    case "ITAT":
+      return `(income tax appellate tribunal OR ITAT OR section 253 of income tax act OR section 254 of income tax act) AND year:${selectedYear}`;
+    case "GST":
+      return `(GST OR g.s.t OR goods and services tax OR CESTAT OR gst act) AND year:${selectedYear}`;
+    case "INCOME_TAX":
+      return `(income tax OR income-tax act OR income tax return OR section 139 OR section 143 OR section 147) AND year:${selectedYear}`;
+    case "HIGH_COURT":
+      return `(high court judgment OR high court order) AND year:${selectedYear}`;
+    case "SUPREME_COURT":
+      return `(supreme court judgment OR supreme court order) AND year:${selectedYear}`;
+    case "TRIBUNAL":
+      return `(tribunal OR appellate authority) AND year:${selectedYear}`;
+    case "all":
+    default:
+      return `(income tax OR income-tax act OR income tax return OR gst OR g.s.t OR gst act OR section 139 of income tax act OR section 143 of income tax act OR section 147 of income tax act OR section 148 of income tax act OR section 61 of gst act OR section 62 of gst act OR section 63 of gst act OR section 64 of gst act OR section 65 of gst act OR section 66 of gst act OR section 67 of gst act OR section 68 of gst act OR section 69 of gst act OR section 70 of gst act OR section 71 of gst act OR section 72 of gst act OR section 73 of gst act OR section 74 of gst act OR section 75 of gst act OR section 76 of gst act OR section 77 of gst act) AND year:${selectedYear}`;
+  }
+}
 };
+
 
 const mapDocSourceToCategory = (docsource:string) => {
   const source = docsource?.toLowerCase() || "";
@@ -191,9 +215,16 @@ useEffect(() => {
   const loadData = async () => {
     try {
       const formInput = encodeURIComponent(getFormInputByCategory(selectedCategory));
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/case-laws?pagenum=${currentPage - 1}&formInput=${formInput}`
-      );
+      
+      // Build the API URL dynamically based on year selection
+      let apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/case-laws?pagenum=${currentPage - 1}&formInput=${formInput}`;
+      
+      // Only add year parameter if a specific year is selected (not "all")
+      if (selectedYear !== "all") {
+        apiUrl += `&year=${selectedYear}`;
+      }
+      
+      const res = await fetch(apiUrl);
 
       const json = await res.json();
 
@@ -210,7 +241,7 @@ useEffect(() => {
           title: cleanTitle,
           court: item.docsource ?? "Unknown",
           date: item.publishdate ?? "",
-         category: mapDocSourceToCategory(item.docsource ?? ""),
+          category: mapDocSourceToCategory(item.docsource ?? ""),
           outcome: "allowed",
           parties: {
             appellant: "",
@@ -233,8 +264,7 @@ useEffect(() => {
   };
 
   loadData();
-}, [currentPage, selectedCategory]);
-
+}, [currentPage, selectedCategory, selectedYear]);
 
 
 
@@ -286,12 +316,12 @@ useEffect(() => {
       );
     }
 
-    if (selectedYear !== "all") {
-      filtered = filtered.filter(
-        (caseItem) =>
-          new Date(caseItem.date).getFullYear().toString() === selectedYear
-      );
-    }
+    // if (selectedYear !== "all") {
+    //   filtered = filtered.filter(
+    //     (caseItem) =>
+    //       new Date(caseItem.date).getFullYear().toString() === selectedYear
+    //   );
+    // }
     if (selectedSection !== "all") {
       filtered = filtered.filter((caseItem) =>
         caseItem.relevantSections.includes(selectedSection)
