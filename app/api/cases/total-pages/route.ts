@@ -1,12 +1,14 @@
-import { NextRequest,NextResponse } from "next/server";
-import { fetchIndianKanoonTotalPages } from "@/lib/kanoon-api";
+// app/api/case-laws/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { fetchTotalCountByCategory } from "@/lib/kanoon-api";
 
 export async function GET(req: NextRequest) {
-  try {
-    const totalPages = await fetchIndianKanoonTotalPages();
-    return NextResponse.json({ success: true, totalPages });
-  } catch (error) {
-    console.error("Error fetching total pages:", error);
-    return NextResponse.json({ success: false, error: "Failed to fetch total pages" }, { status: 500 });
-  }
+  const { searchParams } = new URL(req.url);
+
+  const pagenum = parseInt(searchParams.get("pagenum") || "0", 10);
+  const formInput = searchParams.get("formInput") || undefined;
+
+  const data = await fetchTotalCountByCategory({ pagenum, formInput });
+
+  return NextResponse.json({ success: true, data });
 }
