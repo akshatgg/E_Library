@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,7 +32,8 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
-import { el } from "date-fns/locale";
+import { ca, el } from "date-fns/locale";
+import { log } from "util";
 
 interface CaseData {
   id: string;
@@ -67,11 +68,15 @@ export function CaseLawsDashboard() {
   const [selectedOutcome, setSelectedOutcome] = useState<string>("all");
   const [selectedYear, setSelectedYear] = useState<string>("all");
   const [selectedSection, setSelectedSection] = useState<string>("all");
+const [foundText, setFoundText] = useState<string | null>(null);
+const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
+const [overallTotal, setOverallTotal] = useState<number>(0);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1); // will increase dynamically
   const [lastPageReached, setLastPageReached] = useState(false);
   const [expandedRows, setExpandedRows] = useState(new Set());
+
 
   const maxButtons = 10;
   const startPage = Math.floor((currentPage - 1) / maxButtons) * maxButtons + 1;
@@ -85,43 +90,43 @@ export function CaseLawsDashboard() {
     }
     setExpandedRows(newExpandedRows);
   };
-
+  
   const getFormInputByCategory = (category: string): string => {
-    if (!selectedYear) {
+    if (selectedYear == "all") {
       switch (category) {
         case "ITAT":
-          return "(income tax appellate tribunal OR ITAT OR section 253 of income tax act OR section 254 of income tax act)";
+          return "(ITAT)";
         case "GST":
-          return "(GST OR g.s.t OR goods and services tax OR CESTAT OR gst act)";
+          return "(GST)";
         case "INCOME_TAX":
-          return "(income tax OR income-tax act OR income tax return OR section 139 OR section 143 OR section 147)";
+          return "(income tax)";
         case "HIGH_COURT":
-          return "(high court judgment OR high court order)";
+          return "(high court order)";
         case "SUPREME_COURT":
-          return "(supreme court judgment OR supreme court order)";
+          return "(supreme court order)";
         case "TRIBUNAL":
-          return "(tribunal OR appellate authority)";
+          return "(tribunal)";
         case "all":
         default:
-          return "(income tax OR income-tax act OR income tax return OR gst OR g.s.t OR gst act OR section 139 of income tax act OR section 143 of income tax act OR section 147 of income tax act OR section 148 of income tax act OR section 61 of gst act OR section 62 of gst act OR section 63 of gst act OR section 64 of gst act OR section 65 of gst act OR section 66 of gst act OR section 67 of gst act OR section 68 of gst act OR section 69 of gst act OR section 70 of gst act OR section 71 of gst act OR section 72 of gst act OR section 73 of gst act OR section 74 of gst act OR section 75 of gst act OR section 76 of gst act OR section 77 of gst act OR section 78 of gst act)";
-      }
+          return "(gst OR income tax OR ITAT)"           
+        }
     } else {
       switch (category) {
         case "ITAT":
-          return `(income tax appellate tribunal OR ITAT OR section 253 of income tax act OR section 254 of income tax act) AND year:${selectedYear}`;
+          return `(ITAT) AND year:${selectedYear}`;
         case "GST":
-          return `(GST OR g.s.t OR goods and services tax OR CESTAT OR gst act) AND year:${selectedYear}`;
+          return `(GST) AND year:${selectedYear}`;
         case "INCOME_TAX":
-          return `(income tax OR income-tax act OR income tax return OR section 139 OR section 143 OR section 147) AND year:${selectedYear}`;
+          return `(income tax) AND year:${selectedYear}`;
         case "HIGH_COURT":
-          return `(high court judgment OR high court order) AND year:${selectedYear}`;
+          return `(high court order) AND year:${selectedYear}`;
         case "SUPREME_COURT":
-          return `(supreme court judgment OR supreme court order) AND year:${selectedYear}`;
+          return `(supreme court order) AND year:${selectedYear}`;
         case "TRIBUNAL":
           return `(tribunal OR appellate authority) AND year:${selectedYear}`;
         case "all":
         default:
-          return `(income tax OR income-tax act OR income tax return OR gst OR g.s.t OR gst act OR section 139 of income tax act OR section 143 of income tax act OR section 147 of income tax act OR section 148 of income tax act OR section 61 of gst act OR section 62 of gst act OR section 63 of gst act OR section 64 of gst act OR section 65 of gst act OR section 66 of gst act OR section 67 of gst act OR section 68 of gst act OR section 69 of gst act OR section 70 of gst act OR section 71 of gst act OR section 72 of gst act OR section 73 of gst act OR section 74 of gst act OR section 75 of gst act OR section 76 of gst act OR section 77 of gst act) AND year:${selectedYear}`;
+          return "(gst OR income tax OR income tax appellate tribunal )"           
       }
     }
   };
@@ -136,6 +141,50 @@ export function CaseLawsDashboard() {
     if (source.includes("supreme court")) return "SUPREME_COURT";
     return "OTHER";
   };
+
+  
+
+useEffect(() => {
+  const fetchAllCategoryCounts = async () => {
+    const categories = ["ITAT", "GST", "INCOME_TAX", "HIGH_COURT", "SUPREME_COURT"];
+    const counts: Record<string, number> = {};
+    let total = 0;
+
+    for (const cat of categories) {
+      const formInput = encodeURIComponent(getFormInputByCategory(cat));
+      let url = `/api/cases/total-pages?formInput=${formInput}`;
+      if (selectedYear !== "all") {
+        url += `&year=${selectedYear}`;
+      }
+
+      try {
+        const res = await fetch(url);
+        const json = await res.json();
+
+
+        
+        if (json.success) {
+          counts[cat] = json.data;
+          total += json.data;
+        } else {
+          counts[cat] = 0;
+        }
+      } catch (err) {
+        console.error(`Failed for ${cat}`, err);
+        counts[cat] = 0;
+      }
+    }
+
+    setCategoryCounts(counts);
+    setOverallTotal(total);
+  };
+
+  fetchAllCategoryCounts();
+}, [selectedYear]);
+
+
+
+
 
   useEffect(() => {
     const loadData = async () => {
@@ -156,9 +205,11 @@ export function CaseLawsDashboard() {
         }
 
         const res = await fetch(apiUrl);
-
+        
         const json = await res.json();
         console.log("Fetched data:", json);
+
+
 
         if (!json.success || !Array.isArray(json.data)) {
           console.error("Invalid API response format", json);
@@ -306,23 +357,64 @@ export function CaseLawsDashboard() {
       colors[outcome as keyof typeof colors] || "bg-gray-100 text-gray-800"
     );
   };
+useEffect(() => {
+  const fetchTotalCount = async () => {
+    try {
+      setLoading(true);
 
+      const formInput = getFormInputByCategory(selectedCategory);
+      const encodedFormInput = encodeURIComponent(formInput);
+
+      // Build the API URL dynamically
+      let countUrl = `/api/cases/total-pages?formInput=${encodedFormInput}`;
+      if (selectedYear !== "all") {
+        countUrl += `&year=${selectedYear}`;
+      }
+
+      const res = await fetch(countUrl);
+      const json = await res.json();
+
+      console.log("Total count response:", json);
+
+      if (json.success) {
+        const totalItems = json.data;
+        console.log("Total items found:", totalItems);
+        setFoundText(totalItems);
+        console.log("Found text:", foundText);
+        
+        
+        
+        setTotalPages(Math.ceil(totalItems / 10)); // 🧮 assuming 10 results per page
+      } else {
+        console.warn("Total count not found in response");
+      }
+    } catch (error) {
+      console.error("Error fetching total count:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchTotalCount();
+}, [selectedCategory, selectedYear,foundText]);
+    
+  const totalcasescount=categoryCounts["ITAT"] +categoryCounts["GST"] + categoryCounts["INCOME_TAX"] + categoryCounts["HIGH_COURT"] + categoryCounts["SUPREME_COURT"];
   const stats = [
     {
       label: "Total Cases",
-      value: cases.length,
+      value: totalcasescount,
       icon: Scale,
       color: "text-blue-600",
     },
     {
       label: "ITAT Cases",
-      value: cases.filter((c) => c.category === "ITAT").length,
+      value: categoryCounts["ITAT"] ?? 0,
       icon: Building,
       color: "text-green-600",
     },
     {
       label: "GST Cases",
-      value: cases.filter((c) => c.category === "GST").length,
+      value: categoryCounts["GST"] ?? 0,
 
       icon: TrendingUp,
       color: "text-purple-600",
@@ -513,7 +605,7 @@ export function CaseLawsDashboard() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-gray-600">
-                  Found {filteredCases.length} case
+                  Found {foundText} case
                   {filteredCases.length !== 1 ? "s" : ""}
                 </p>
               </div>
@@ -535,162 +627,7 @@ export function CaseLawsDashboard() {
                   ))}
                 </div>
               ) : (
-                // filteredCases.map((caseItem) => (
-                //   <Card
-                //     key={caseItem.id}
-                //     className="hover:shadow-lg transition-shadow"
-                //   >
-                //     <CardContent className="p-6">
-                //       <div className="flex items-start justify-between mb-4">
-                //         <div className="flex-1">
-                //           <h3 className="text-xl font-bold mb-2">
-                //             {caseItem.title}
-                //           </h3>
-                //           <div className="flex flex-wrap gap-2 mb-3">
-                //             <Badge
-                //               className={getCategoryColor(caseItem.category)}
-                //             >
-                //               {caseItem.category}
-                //             </Badge>
-                //             <Badge
-                //               variant="outline"
-                //               className="flex items-center gap-1"
-                //             >
-                //               <Calendar className="h-3 w-3" />
-                //               {new Date(caseItem.date).toLocaleDateString()}
-                //             </Badge>
-                //             <Badge
-                //               className={getOutcomeColor(caseItem.outcome)}
-                //             >
-                //               {caseItem.outcome.replace("_", " ").toUpperCase()}
-                //             </Badge>
-                //             <Badge
-                //               variant="outline"
-                //               className="flex items-center gap-1"
-                //             >
-                //               <MapPin className="h-3 w-3" />
-                //               {caseItem.court}
-                //             </Badge>
-                //           </div>
-                //         </div>
-                //         <div className="flex gap-2">
-                //           <Button
-                //             size="sm"
-                //             variant="outline"
-                //             onClick={() => window.open(caseItem.url, "_blank")}
-                //           >
-                //             <Eye className="h-4 w-4" />
-                //           </Button>
-                //           {caseItem.pdfUrl && (
-                //             <Button
-                //               size="sm"
-                //               variant="outline"
-                //               onClick={() =>
-                //                 window.open(caseItem.pdfUrl, "_blank")
-                //               }
-                //             >
-                //               <Download className="h-4 w-4" />
-                //             </Button>
-                //           )}
-                //           <Button size="sm" variant="outline">
-                //             <Share2 className="h-4 w-4" />
-                //           </Button>
-                //         </div>
-                //       </div>
-
-                //       <p className="text-gray-700 mb-4">{caseItem.summary}</p>
-
-                //       <div className="space-y-3">
-                //         <div>
-                //           <p className="text-sm font-medium text-gray-600 mb-1">
-                //             Case Number:
-                //           </p>
-                //           <p className="text-sm">{caseItem.caseNumber}</p>
-                //         </div>
-
-                //         <div>
-                //           <p className="text-sm font-medium text-gray-600 mb-1">
-                //             Parties:
-                //           </p>
-                //           <p className="text-sm">
-                //             {caseItem.parties.appellant} vs{" "}
-                //             {caseItem.parties.respondent}
-                //           </p>
-                //         </div>
-
-                //         {caseItem.relevantSections.length > 0 && (
-                //           <div>
-                //             <p className="text-sm font-medium text-gray-600 mb-1">
-                //               Relevant Sections:
-                //             </p>
-                //             <div className="flex flex-wrap gap-1">
-                //               {caseItem.relevantSections.map(
-                //                 (section, index) => (
-                //                   <Badge
-                //                     key={index}
-                //                     variant="secondary"
-                //                     className="text-xs"
-                //                   >
-                //                     {section}
-                //                   </Badge>
-                //                 )
-                //               )}
-                //             </div>
-                //           </div>
-                //         )}
-
-                //         {caseItem.keywords.length > 0 && (
-                //           <div>
-                //             <p className="text-sm font-medium text-gray-600 mb-1">
-                //               Keywords:
-                //             </p>
-                //             <div className="flex flex-wrap gap-1">
-                //               {caseItem.keywords
-                //                 .slice(0, 5)
-                //                 .map((keyword, index) => (
-                //                   <Badge
-                //                     key={index}
-                //                     variant="outline"
-                //                     className="text-xs"
-                //                   >
-                //                     {keyword}
-                //                   </Badge>
-                //                 ))}
-                //               {caseItem.keywords.length > 5 && (
-                //                 <Badge variant="outline" className="text-xs">
-                //                   +{caseItem.keywords.length - 5} more
-                //                 </Badge>
-                //               )}
-                //             </div>
-                //           </div>
-                //         )}
-
-                //         {caseItem.legalPoints.length > 0 && (
-                //           <div>
-                //             <p className="text-sm font-medium text-gray-600 mb-1">
-                //               Key Legal Points:
-                //             </p>
-                //             <ul className="text-sm space-y-1">
-                //               {caseItem.legalPoints
-                //                 .slice(0, 3)
-                //                 .map((point, index) => (
-                //                   <li
-                //                     key={index}
-                //                     className="flex items-start gap-2"
-                //                   >
-                //                     <span className="text-blue-600 mt-1">
-                //                       •
-                //                     </span>
-                //                     <span>{point}</span>
-                //                   </li>
-                //                 ))}
-                //             </ul>
-                //           </div>
-                //         )}
-                //       </div>
-                //     </CardContent>
-                //   </Card>
-                // ))
+              
                 <div className="overflow-x-auto bg-white">
                   <table className="w-full border-collapse border border-gray-300 bg-white">
                     <thead>
@@ -922,9 +859,10 @@ export function CaseLawsDashboard() {
                     <CardContent>
                       <div className="space-y-2">
                         <p className="text-2xl font-bold">
-                          {cases.filter((c) => c.category === category).length}
-                        </p>
-                        <p className="text-sm text-gray-600">Available cases</p>
+  {categoryCounts[category] ?? 0}
+</p>
+<p className="text-sm text-gray-600">Available cases</p>
+
                         <Button
                           variant="outline"
                           className="w-full"
@@ -949,40 +887,35 @@ export function CaseLawsDashboard() {
                 <CardHeader>
                   <CardTitle>Case Distribution by Category</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {[
-                      "ITAT",
-                      "GST",
-                      "INCOME_TAX",
-                      "HIGH_COURT",
-                      "SUPREME_COURT",
-                    ].map((category) => {
-                      const count = cases.filter(
-                        (c) => c.category === category
-                      ).length;
-                      const percentage = (count / cases.length) * 100;
-                      return (
-                        <div key={category} className="space-y-2">
-                          <div className="flex justify-between">
-                            <span className="text-sm font-medium">
-                              {category.replace("_", " ")}
-                            </span>
-                            <span className="text-sm text-gray-600">
-                              {count} ({percentage.toFixed(1)}%)
-                            </span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div
-                              className="bg-blue-600 h-2 rounded-full"
-                              style={{ width: `${percentage}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
+     <CardContent>
+  <div className="space-y-4">
+    {["ITAT", "GST", "INCOME_TAX", "HIGH_COURT", "SUPREME_COURT"].map((category) => {
+      const count = categoryCounts[category] ?? 0;
+      const percentage = totalcasescount > 0 ? (count / totalcasescount) * 100 : 0;
+
+      return (
+        <div key={category} className="space-y-2">
+          <div className="flex justify-between">
+            <span className="text-sm font-medium">
+              {category.replace("_", " ")}
+            </span>
+            <span className="text-sm text-gray-600">
+              {count.toLocaleString()} ({percentage.toFixed(1)}%)
+            </span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div
+              className="bg-blue-600 h-2 rounded-full"
+              style={{ width: `${percentage}%` }}
+            ></div>
+          </div>
+        </div>
+      );
+    })}
+  </div>
+</CardContent>
+
+
               </Card>
 
               <Card>

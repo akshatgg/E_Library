@@ -96,6 +96,41 @@ export async function fetchCaseByTid(tid: number): Promise<any> {
 
 
 
+export async function fetchTotalCountByCategory(props: FetchKanoonProps): Promise<number> {
+  try {
+    const {
+      formInput = "(income tax appellate tribunal OR ITAT OR income-tax appellate tribunal OR income tax appellate court)",
+      pagenum = 0,
+      year,
+    } = props;
+
+    // Include year in the query if specified
+    const finalQuery = year ? `${formInput} ${year}` : formInput;
+
+    const params = new URLSearchParams();
+    params.append("formInput", finalQuery);
+    params.append("pagenum", pagenum.toString());
+
+    const response = await axios.post(`${INDIAN_KANOON_ENDPOINT}/search/`, params, {
+      headers: {
+        Authorization: `Token ${INDIAN_KANOON_TOKEN}`,
+        Accept: "application/json",
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+    });
+
+    // Extract number from 'found': e.g., "11 - 20 of 13011"
+    const foundText: string | undefined = response.data?.found;
+    if (!foundText) return 0;
+
+    const match = foundText.match(/of\s+(\d+)/i);
+    return match ? parseInt(match[1], 10) : 0;
+
+  } catch (error) {
+    console.error("Error fetching total count by category:", error);
+    return 0;
+  }
+}
 
 
 
