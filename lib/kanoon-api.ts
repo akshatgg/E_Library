@@ -1,7 +1,7 @@
 // indiankanoonAPI.ts
 import axios from "axios";
 
-const INDIAN_KANOON_TOKEN = "d58940b08012f775f02a5f61063222a844ad3e24";
+const INDIAN_KANOON_TOKEN = "6bef172229d5a1ae70ecbfc79443d81eb63205e5";
 const INDIAN_KANOON_ENDPOINT = "https://api.indiankanoon.org";
 
 export interface IKanoonResult {
@@ -40,7 +40,7 @@ export async function fetchIndianKanoonData(props: FetchKanoonProps = {}): Promi
       params,
       {
         headers: {
-          Authorization: `Token d58940b08012f775f02a5f61063222a844ad3e24`,
+          Authorization: `Token ${INDIAN_KANOON_TOKEN}`,
           Accept: "application/json",
           "Content-Type": "application/x-www-form-urlencoded",
         },

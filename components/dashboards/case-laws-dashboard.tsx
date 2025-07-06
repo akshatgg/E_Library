@@ -156,7 +156,7 @@ export function CaseLawsDashboard() {
         }
 
         const res = await fetch(apiUrl);
-
+        console.log(`res is `, res);
         const json = await res.json();
         console.log("Fetched data:", json);
 
