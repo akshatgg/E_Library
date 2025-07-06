@@ -23,7 +23,7 @@ export default class EmailService {
   static async initialize() {
     if (EmailService.transporter != null) return
 
-    const user = process.env.OPT_EMAIL
+    const user = process.env.OTP_EMAIL
     const pass = process.env.OTP_PASS
 
     if (!user || !pass) {
@@ -83,7 +83,7 @@ export default class EmailService {
       `
 
       const mailOptions: SendMailOptions = {
-        from: `"${name}" <${process.env.OPT_EMAIL}>`, // still use your SMTP email but show user's name
+        from: `"${name}" <${process.env.OTP_EMAIL}>`, // still use your SMTP email but show user's name
         to: 'support@itaxeasy.com', // support email
         subject: `Contact Form: ${subject}`,
         text: emailContent,
