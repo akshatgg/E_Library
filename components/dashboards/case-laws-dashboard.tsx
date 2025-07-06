@@ -156,9 +156,7 @@ export function CaseLawsDashboard() {
         }
 
         const res = await fetch(apiUrl);
-        console.log(`res is `, res);
         const json = await res.json();
-        console.log("Fetched data:", json);
 
         if (!json.success || !Array.isArray(json.data)) {
           console.error("Invalid API response format", json);
