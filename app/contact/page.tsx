@@ -34,29 +34,66 @@ export default function ContactPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
 
+  // const handleSubmit = async (e: React.FormEvent) => {
+  //   e.preventDefault()
+  //   setIsSubmitting(true)
+
+  //   // Simulate form submission
+  //   await new Promise((resolve) => setTimeout(resolve, 2000))
+
+  //   setIsSubmitting(false)
+  //   setIsSubmitted(true)
+
+  //   // Reset form after 3 seconds
+  //   setTimeout(() => {
+  //     setIsSubmitted(false)
+  //     setFormData({
+  //       name: "",
+  //       email: "",
+  //       phone: "",
+  //       subject: "",
+  //       category: "",
+  //       message: "",
+  //     })
+  //   }, 3000)
+  // }
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsSubmitting(true)
+  e.preventDefault()
+  setIsSubmitting(true)
 
-    // Simulate form submission
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+  try {
+    const response = await fetch("/api/contact", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(formData),
+    })
 
+    const result = await response.json()
+
+    if (response.ok && result.success) {
+      setIsSubmitted(true)
+      setTimeout(() => {
+        setIsSubmitted(false)
+        setFormData({
+          name: "",
+          email: "",
+          phone: "",
+          subject: "",
+          category: "",
+          message: "",
+        })
+      }, 3000)
+    } else {
+      alert("❌ Message failed to send: " + (result.message || "Unknown error"))
+    }
+  } catch (error) {
+    console.error("❌ Submit error:", error)
+    alert("An unexpected error occurred. Please try again later.")
+  } finally {
     setIsSubmitting(false)
-    setIsSubmitted(true)
-
-    // Reset form after 3 seconds
-    setTimeout(() => {
-      setIsSubmitted(false)
-      setFormData({
-        name: "",
-        email: "",
-        phone: "",
-        subject: "",
-        category: "",
-        message: "",
-      })
-    }, 3000)
   }
+}
+
 
   const contactMethods = [
     {

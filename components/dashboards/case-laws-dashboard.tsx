@@ -205,9 +205,10 @@ useEffect(() => {
         }
 
         const res = await fetch(apiUrl);
+
         
+
         const json = await res.json();
-        console.log("Fetched data:", json);
 
 
 
