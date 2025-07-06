@@ -28,6 +28,8 @@ import {
   Building,
   Gavel,
   FormInput,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { el } from "date-fns/locale";
@@ -36,6 +38,7 @@ interface CaseData {
   id: string;
   title: string;
   court: string;
+  bench: string;
   date: string;
   category: "ITAT" | "GST" | "INCOME_TAX" | "HIGH_COURT" | "SUPREME_COURT";
   outcome: "allowed" | "dismissed" | "partly_allowed";
@@ -52,90 +55,7 @@ interface CaseData {
   pdfUrl?: string;
 }
 
- 
-const mockCases: CaseData[] = [
-  {
-    id: "1",
-    title: "Commissioner of Income Tax vs. ABC Industries Ltd.",
-    court: "ITAT Delhi",
-    date: "2024-01-15",
-    category: "ITAT",
-    outcome: "allowed",
-    parties: {
-      appellant: "Commissioner of Income Tax",
-      respondent: "ABC Industries Ltd.",
-    },
-    caseNumber: "ITA No. 1234/Del/2023",
-    summary:
-      "The case deals with disallowance under section 14A of the Income Tax Act. The ITAT held that when no exempt income is earned during the year, no disallowance under section 14A can be made.",
-    relevantSections: ["Section 14A", "Rule 8D"],
-    keywords: ["disallowance", "exempt income", "section 14A", "rule 8D"],
-    legalPoints: [
-      "No disallowance under section 14A when no exempt income earned",
-      "Rule 8D application requires actual exempt income",
-      "Burden of proof on revenue department",
-    ],
-    url: "https://example.com/case/1",
-    pdfUrl: "https://example.com/case/1.pdf",
-  },
-  {
-    id: "2",
-    title: "XYZ Pvt. Ltd. vs. Commissioner of GST",
-    court: "CESTAT Mumbai",
-    date: "2024-01-10",
-    category: "GST",
-    outcome: "partly_allowed",
-    parties: {
-      appellant: "XYZ Pvt. Ltd.",
-      respondent: "Commissioner of GST",
-    },
-    caseNumber: "GST Appeal No. 5678/2023",
-    summary:
-      "Appeal against denial of input tax credit on certain services. The tribunal allowed ITC on legitimate business expenses but denied on personal expenses.",
-    relevantSections: ["Section 16", "Section 17", "Rule 36"],
-    keywords: [
-      "input tax credit",
-      "ITC",
-      "business expenses",
-      "personal expenses",
-    ],
-    legalPoints: [
-      "ITC allowed only on legitimate business expenses",
-      "Clear segregation required between business and personal use",
-      "Proper documentation mandatory for ITC claims",
-    ],
-    url: "https://example.com/case/2",
-  },
-  {
-    id: "3",
-    title: "Union of India vs. Reliance Industries",
-    court: "Supreme Court of India",
-    date: "2024-01-05",
-    category: "SUPREME_COURT",
-    outcome: "dismissed",
-    parties: {
-      appellant: "Union of India",
-      respondent: "Reliance Industries",
-    },
-    caseNumber: "Civil Appeal No. 9876/2023",
-    summary:
-      "Constitutional validity of certain provisions of the Income Tax Act challenged. The Supreme Court upheld the constitutional validity of the impugned provisions.",
-    relevantSections: ["Article 14", "Article 19", "Section 68"],
-    keywords: [
-      "constitutional validity",
-      "article 14",
-      "article 19",
-      "cash credits",
-    ],
-    legalPoints: [
-      "Constitutional validity of Section 68 upheld",
-      "Reasonable classification does not violate Article 14",
-      "Provisions are in public interest",
-    ],
-    url: "https://example.com/case/3",
-    pdfUrl: "https://example.com/case/3.pdf",
-  },
-];
+const mockCases: CaseData[] = [];
 
 export function CaseLawsDashboard() {
   const [cases, setCases] = useState<CaseData[]>(mockCases);
@@ -148,125 +68,139 @@ export function CaseLawsDashboard() {
   const [selectedYear, setSelectedYear] = useState<string>("all");
   const [selectedSection, setSelectedSection] = useState<string>("all");
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1); // will increase dynamically
+  const [lastPageReached, setLastPageReached] = useState(false);
+  const [expandedRows, setExpandedRows] = useState(new Set());
 
+  const maxButtons = 10;
+  const startPage = Math.floor((currentPage - 1) / maxButtons) * maxButtons + 1;
 
+  const toggleRow = (caseId: string) => {
+    const newExpandedRows = new Set(expandedRows);
+    if (newExpandedRows.has(caseId)) {
+      newExpandedRows.delete(caseId);
+    } else {
+      newExpandedRows.add(caseId);
+    }
+    setExpandedRows(newExpandedRows);
+  };
 
-const [currentPage, setCurrentPage] = useState(1);
-const [totalPages, setTotalPages] = useState(1); // will increase dynamically
-const [lastPageReached, setLastPageReached] = useState(false);
-
-const maxButtons = 10;
-const startPage = Math.floor((currentPage - 1) / maxButtons) * maxButtons + 1;
-
-const getFormInputByCategory = (category: string): string => {
-  if(!selectedYear){
-  switch (category) {
-    case "ITAT":
-      return "(income tax appellate tribunal OR ITAT OR section 253 of income tax act OR section 254 of income tax act)";
-    case "GST":
-      return "(GST OR g.s.t OR goods and services tax OR CESTAT OR gst act)";
-    case "INCOME_TAX":
-      return "(income tax OR income-tax act OR income tax return OR section 139 OR section 143 OR section 147)";
-    case "HIGH_COURT":
-      return "(high court judgment OR high court order)";
-    case "SUPREME_COURT":
-      return "(supreme court judgment OR supreme court order)";
-    case "TRIBUNAL":
-      return "(tribunal OR appellate authority)";
-    case "all":
-    default:
-      return "(income tax OR income-tax act OR income tax return OR gst OR g.s.t OR gst act OR section 139 of income tax act OR section 143 of income tax act OR section 147 of income tax act OR section 148 of income tax act OR section 61 of gst act OR section 62 of gst act OR section 63 of gst act OR section 64 of gst act OR section 65 of gst act OR section 66 of gst act OR section 67 of gst act OR section 68 of gst act OR section 69 of gst act OR section 70 of gst act OR section 71 of gst act OR section 72 of gst act OR section 73 of gst act OR section 74 of gst act OR section 75 of gst act OR section 76 of gst act OR section 77 of gst act OR section 78 of gst act)";
-  }
-}
-else{
-
-  switch (category) {
-    case "ITAT":
-      return `(income tax appellate tribunal OR ITAT OR section 253 of income tax act OR section 254 of income tax act) AND year:${selectedYear}`;
-    case "GST":
-      return `(GST OR g.s.t OR goods and services tax OR CESTAT OR gst act) AND year:${selectedYear}`;
-    case "INCOME_TAX":
-      return `(income tax OR income-tax act OR income tax return OR section 139 OR section 143 OR section 147) AND year:${selectedYear}`;
-    case "HIGH_COURT":
-      return `(high court judgment OR high court order) AND year:${selectedYear}`;
-    case "SUPREME_COURT":
-      return `(supreme court judgment OR supreme court order) AND year:${selectedYear}`;
-    case "TRIBUNAL":
-      return `(tribunal OR appellate authority) AND year:${selectedYear}`;
-    case "all":
-    default:
-      return `(income tax OR income-tax act OR income tax return OR gst OR g.s.t OR gst act OR section 139 of income tax act OR section 143 of income tax act OR section 147 of income tax act OR section 148 of income tax act OR section 61 of gst act OR section 62 of gst act OR section 63 of gst act OR section 64 of gst act OR section 65 of gst act OR section 66 of gst act OR section 67 of gst act OR section 68 of gst act OR section 69 of gst act OR section 70 of gst act OR section 71 of gst act OR section 72 of gst act OR section 73 of gst act OR section 74 of gst act OR section 75 of gst act OR section 76 of gst act OR section 77 of gst act) AND year:${selectedYear}`;
-  }
-}
-};
-
-
-const mapDocSourceToCategory = (docsource:string) => {
-  const source = docsource?.toLowerCase() || "";
-  if (source.includes('itat')) return 'ITAT';
-  if (source.includes('gst') || source.includes('cestat')) return 'GST';
-  if (source.includes('income tax') || source.includes('income-tax')) return 'INCOME_TAX';
-  if (source.includes('high court')) return 'HIGH_COURT';
-  if (source.includes('supreme court')) return 'SUPREME_COURT';
-  return 'OTHER';
-};
-
-useEffect(() => {
-  const loadData = async () => {
-    try {
-      const formInput = encodeURIComponent(getFormInputByCategory(selectedCategory));
-      
-      // Build the API URL dynamically based on year selection
-      let apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/case-laws?pagenum=${currentPage - 1}&formInput=${formInput}`;
-      
-      // Only add year parameter if a specific year is selected (not "all")
-      if (selectedYear !== "all") {
-        apiUrl += `&year=${selectedYear}`;
+  const getFormInputByCategory = (category: string): string => {
+    if (!selectedYear) {
+      switch (category) {
+        case "ITAT":
+          return "(income tax appellate tribunal OR ITAT OR section 253 of income tax act OR section 254 of income tax act)";
+        case "GST":
+          return "(GST OR g.s.t OR goods and services tax OR CESTAT OR gst act)";
+        case "INCOME_TAX":
+          return "(income tax OR income-tax act OR income tax return OR section 139 OR section 143 OR section 147)";
+        case "HIGH_COURT":
+          return "(high court judgment OR high court order)";
+        case "SUPREME_COURT":
+          return "(supreme court judgment OR supreme court order)";
+        case "TRIBUNAL":
+          return "(tribunal OR appellate authority)";
+        case "all":
+        default:
+          return "(income tax OR income-tax act OR income tax return OR gst OR g.s.t OR gst act OR section 139 of income tax act OR section 143 of income tax act OR section 147 of income tax act OR section 148 of income tax act OR section 61 of gst act OR section 62 of gst act OR section 63 of gst act OR section 64 of gst act OR section 65 of gst act OR section 66 of gst act OR section 67 of gst act OR section 68 of gst act OR section 69 of gst act OR section 70 of gst act OR section 71 of gst act OR section 72 of gst act OR section 73 of gst act OR section 74 of gst act OR section 75 of gst act OR section 76 of gst act OR section 77 of gst act OR section 78 of gst act)";
       }
-      
-      const res = await fetch(apiUrl);
-
-      const json = await res.json();
-
-      if (!json.success || !Array.isArray(json.data)) {
-        console.error("Invalid API response format", json);
-        return;
+    } else {
+      switch (category) {
+        case "ITAT":
+          return `(income tax appellate tribunal OR ITAT OR section 253 of income tax act OR section 254 of income tax act) AND year:${selectedYear}`;
+        case "GST":
+          return `(GST OR g.s.t OR goods and services tax OR CESTAT OR gst act) AND year:${selectedYear}`;
+        case "INCOME_TAX":
+          return `(income tax OR income-tax act OR income tax return OR section 139 OR section 143 OR section 147) AND year:${selectedYear}`;
+        case "HIGH_COURT":
+          return `(high court judgment OR high court order) AND year:${selectedYear}`;
+        case "SUPREME_COURT":
+          return `(supreme court judgment OR supreme court order) AND year:${selectedYear}`;
+        case "TRIBUNAL":
+          return `(tribunal OR appellate authority) AND year:${selectedYear}`;
+        case "all":
+        default:
+          return `(income tax OR income-tax act OR income tax return OR gst OR g.s.t OR gst act OR section 139 of income tax act OR section 143 of income tax act OR section 147 of income tax act OR section 148 of income tax act OR section 61 of gst act OR section 62 of gst act OR section 63 of gst act OR section 64 of gst act OR section 65 of gst act OR section 66 of gst act OR section 67 of gst act OR section 68 of gst act OR section 69 of gst act OR section 70 of gst act OR section 71 of gst act OR section 72 of gst act OR section 73 of gst act OR section 74 of gst act OR section 75 of gst act OR section 76 of gst act OR section 77 of gst act) AND year:${selectedYear}`;
       }
-
-      const mappedCases = json.data.map((item: any, idx: number) => {
-        const cleanHeadline = item.headline?.replace(/<[^>]+>/g, "") ?? "";
-        const cleanTitle = item.title?.replace(/<[^>]+>/g, "") ?? "";
-        return {
-          id: item.tid?.toString() ?? String(idx),
-          title: cleanTitle,
-          court: item.docsource ?? "Unknown",
-          date: item.publishdate ?? "",
-          category: mapDocSourceToCategory(item.docsource ?? ""),
-          outcome: "allowed",
-          parties: {
-            appellant: "",
-            respondent: "",
-          },
-          caseNumber: `${item.tid}`,
-          summary: cleanHeadline,
-          relevantSections: [],
-          keywords: [],
-          legalPoints: [],
-          url: `https://indiankanoon.org/doc/${item.tid}`,
-        };
-      });
-
-      setCases(mappedCases);
-      setTotalPages(10); // Adjust if dynamic totalPages available
-    } catch (error) {
-      console.error("Error fetching data:", error);
     }
   };
 
-  loadData();
-}, [currentPage, selectedCategory, selectedYear]);
+  const mapDocSourceToCategory = (docsource: string) => {
+    const source = docsource?.toLowerCase() || "";
+    if (source.includes("itat")) return "ITAT";
+    if (source.includes("gst") || source.includes("cestat")) return "GST";
+    if (source.includes("income tax") || source.includes("income-tax"))
+      return "INCOME_TAX";
+    if (source.includes("high court")) return "HIGH_COURT";
+    if (source.includes("supreme court")) return "SUPREME_COURT";
+    return "OTHER";
+  };
 
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        const formInput = encodeURIComponent(
+          getFormInputByCategory(selectedCategory)
+        );
 
+        // Build the API URL dynamically based on year selection
+        let apiUrl = `${
+          process.env.NEXT_PUBLIC_API_URL
+        }/api/case-laws?pagenum=${currentPage - 1}&formInput=${formInput}`;
+
+        // Only add year parameter if a specific year is selected (not "all")
+        if (selectedYear !== "all") {
+          apiUrl += `&year=${selectedYear}`;
+        }
+
+        const res = await fetch(apiUrl);
+
+        const json = await res.json();
+        console.log("Fetched data:", json);
+
+        if (!json.success || !Array.isArray(json.data)) {
+          console.error("Invalid API response format", json);
+          setLoading(false);
+          return;
+        }
+
+        const mappedCases = json.data.map((item: any, idx: number) => {
+          const cleanHeadline = item.headline?.replace(/<[^>]+>/g, "") ?? "";
+          const cleanTitle = item.title?.replace(/<[^>]+>/g, "") ?? "";
+          return {
+            id: item.tid?.toString() ?? String(idx),
+            title: cleanTitle,
+            court: item.docsource ?? "Unknown",
+            date: item.publishdate ?? "",
+            bench: item.bench ?? "",
+            category: mapDocSourceToCategory(item.docsource ?? ""),
+            outcome: "allowed",
+            parties: {
+              appellant: "",
+              respondent: "",
+            },
+            caseNumber: `${item.tid}`,
+            summary: cleanHeadline,
+            relevantSections: [],
+            keywords: [],
+            legalPoints: [],
+            url: `https://indiankanoon.org/doc/${item.tid}`,
+          };
+        });
+
+        setCases(mappedCases);
+        setTotalPages(10);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [currentPage, selectedCategory, selectedYear]);
 
   useEffect(() => {
     filterCases();
@@ -316,12 +250,12 @@ useEffect(() => {
       );
     }
 
-    // if (selectedYear !== "all") {
-    //   filtered = filtered.filter(
-    //     (caseItem) =>
-    //       new Date(caseItem.date).getFullYear().toString() === selectedYear
-    //   );
-    // }
+    if (selectedYear !== "all") {
+      filtered = filtered.filter(
+        (caseItem) =>
+          new Date(caseItem.date).getFullYear().toString() === selectedYear
+      );
+    }
     if (selectedSection !== "all") {
       filtered = filtered.filter((caseItem) =>
         caseItem.relevantSections.includes(selectedSection)
@@ -373,9 +307,6 @@ useEffect(() => {
     );
   };
 
-
-
-   
   const stats = [
     {
       label: "Total Cases",
@@ -392,7 +323,7 @@ useEffect(() => {
     {
       label: "GST Cases",
       value: cases.filter((c) => c.category === "GST").length,
-      
+
       icon: TrendingUp,
       color: "text-purple-600",
     },
@@ -760,221 +691,213 @@ useEffect(() => {
                 //     </CardContent>
                 //   </Card>
                 // ))
-                <div className="overflow-x-auto bg-[#ffffff]">
-                  <table className="w-full border-collapse border border-gray-300 bg-[#ffffff]">
+                <div className="overflow-x-auto bg-white">
+                  <table className="w-full border-collapse border border-gray-300 bg-white">
                     <thead>
-                      <tr className="bg-[#ffffff]">
-                        <th className="border border-gray-300 bg-[#ffffff] px-4 py-3 text-left font-semibold">
+                      <tr className="bg-gray-50">
+                        <th className="border border-gray-300 px-4 py-3 text-left font-semibold w-8"></th>
+                        <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
                           Case No.
                         </th>
-                        <th className="border border-gray-300 bg-[#ffffff] px-4 py-3 text-left font-semibold">
+                        <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
                           Case Title
                         </th>
-                        <th className="border border-gray-300 bg-[#ffffff] px-4 py-3 text-left font-semibold">
-                          Court, Bench, Date
+                        <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
+                          Court
                         </th>
-                        <th className="border border-gray-300 bg-[#ffffff] px-4 py-3 text-left font-semibold">
-                          Full Judgment Text
+                        <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
+                          Bench
                         </th>
-                        <th className="border border-gray-300 bg-[#ffffff] px-4 py-3 text-left font-semibold">
+                        <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
+                          Date
+                        </th>
+                        <th className="border border-gray-300 px-4 py-3 text-left font-semibold">
                           Tags
                         </th>
-                        <th className="border border-gray-300 bg-[#ffffff] px-4 py-3 text-left font-semibold">
-                          Related Sections
-                        </th>
-                        <th className="border border-gray-300 bg-[#ffffff] px-4 py-3 text-center font-semibold">
+                        <th className="border border-gray-300 px-4 py-3 text-center font-semibold">
                           Actions
                         </th>
                       </tr>
                     </thead>
+
                     <tbody>
-                      {filteredCases.map((caseItem) => (
-                        <tr key={caseItem.id} className="hover:bg-gray-50">
-                          {/* Case No. */}
-                          <td className="border border-gray-300 px-4 py-3 align-top">
-                            <div className="text-sm font-medium">
-                              {caseItem.caseNumber}
-                            </div>
-                          </td>
-                          {/* Case Title */}
-                          <td className="border border-gray-300 px-4 py-3 align-top">
-                            <div>
-                              <h3 className="font-bold text-lg mb-1">
-                                {caseItem.title}
-                              </h3>
-                              <p className="text-sm text-gray-600 mb-2">
-                                {caseItem.summary}
-                              </p>
-                              <div className="text-sm">
-                                <p>
-                                  <span className="font-medium">Parties:</span>{" "}
-                                  {caseItem.parties.appellant} vs{" "}
-                                  {caseItem.parties.respondent}
-                                </p>
-                              </div>
-                            </div>
-                          </td>
-
-                          {/* Court, Bench, Date */}
-                          <td className="border border-gray-300 px-4 py-3 align-top">
-                            <div className="space-y-2">
-                              <div className="flex items-center gap-1">
-                                <MapPin className="h-4 w-4 text-gray-500" />
-                                <span className="text-sm font-medium">
-                                  {caseItem.court}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <Calendar className="h-4 w-4 text-gray-500" />
-                                <span className="text-sm">
-                                  {new Date(caseItem.date).toLocaleDateString()}
-                                </span>
-                              </div>
-                              <Badge
-                                className={getOutcomeColor(caseItem.outcome)}
-                              >
-                                {caseItem.outcome
-                                  .replace("_", " ")
-                                  .toUpperCase()}
-                              </Badge>
-                            </div>
-                          </td>
-
-                          {/* Full Judgment Text */}
-                          <td className="border border-gray-300 px-4 py-3 align-top">
-                            <div className="space-y-2">
-                              {caseItem.legalPoints.length > 0 && (
-                                <div>
-                                  <p className="text-sm font-medium text-gray-600 mb-1">
-                                    Key Legal Points:
-                                  </p>
-                                  <ul className="text-sm space-y-1">
-                                    {caseItem.legalPoints
-                                      .slice(0, 2)
-                                      .map((point, index) => (
-                                        <li
-                                          key={index}
-                                          className="flex items-start gap-2"
-                                        >
-                                          <span className="text-blue-600 mt-1">
-                                            •
-                                          </span>
-                                          <span>{point}</span>
-                                        </li>
-                                      ))}
-                                    {caseItem.legalPoints.length > 2 && (
-                                      <li className="text-xs text-gray-500">
-                                        +{caseItem.legalPoints.length - 2} more
-                                        points
-                                      </li>
-                                    )}
-                                  </ul>
-                                </div>
-                              )}
-                            </div>
-                          </td>
-
-                          {/* Tags */}
-                          <td className="border border-gray-300 px-4 py-3 align-top">
-                            <div className="space-y-2">
-                              <div className="space-y-1">
-  <Badge className={getCategoryColor(caseItem.category)}>
-    {caseItem.category}
-  </Badge>
-  {selectedCategory !== "all" && (
-    <Badge className="bg-blue-100 text-blue-800">
-      {selectedCategory}
-    </Badge>
-  )}
-</div>
-                              {caseItem.keywords.length > 0 && (
-                                <div className="flex flex-wrap gap-1">
-                                  {caseItem.keywords
-                                    .slice(0, 3)
-                                    .map((keyword, index) => (
-                                      <Badge key={index} variant="outline">
-                                        {keyword}
-                                      </Badge>
-                                    ))}
-                                  {caseItem.keywords.length > 3 && (
-                                    <Badge variant="outline">
-                                      +{caseItem.keywords.length - 3}
-                                    </Badge>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </td>
-
-                          {/* Related Cases */}
-                          <td className="border border-gray-300 px-4 py-3 align-top">
-                            <div className="text-sm text-gray-600">
-                              <div className="flex flex-col space-y-1">
-                                <div className="flex flex-wrap gap-1">
-                                  {caseItem.relevantSections.length > 0 && (
-                                    <div className="flex flex-wrap gap-1">
-                                      {caseItem.relevantSections
-                                        .slice(0, 3)
-                                        .map((section, index) => (
-                                          <Badge
-                                            key={index}
-                                            variant="secondary"
-                                          >
-                                            {section}
-                                          </Badge>
-                                        ))}
-                                      {caseItem.relevantSections.length > 3 && (
-                                        <Badge variant="outline">
-                                          +
-                                          {caseItem.relevantSections.length - 3}
-                                        </Badge>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-
-                          {/* Share/Download buttons */}
-                          <td className="border border-gray-300 px-4 py-3 align-top">
-                            <div className="flex flex-col gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="w-full"
-                                onClick={() =>
-                                  window.open(caseItem.url, "_blank")
-                                }
-                              >
-                                <Eye className="h-4 w-4 mr-1" />
-                                View
-                              </Button>
-                              {caseItem.pdfUrl && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="w-full"
-                                  onClick={() =>
-                                    window.open(caseItem.pdfUrl, "_blank")
-                                  }
+                      {loading
+                        ? // Show 5 skeleton rows with 8 columns each
+                          Array.from({ length: 5 }).map((_, idx) => (
+                            <tr
+                              key={`loading-${idx}`}
+                              className="animate-pulse"
+                            >
+                              {Array.from({ length: 8 }).map((__, colIdx) => (
+                                <td
+                                  key={colIdx}
+                                  className="border border-gray-300 px-4 py-3 align-top"
                                 >
-                                  <Download className="h-4 w-4 mr-1" />
-                                  Download
-                                </Button>
-                              )}
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="w-full"
+                                  <Skeleton className="h-4 w-full" />
+                                </td>
+                              ))}
+                            </tr>
+                          ))
+                        : filteredCases.map((caseItem) => {
+                            const isExpanded = expandedRows.has(caseItem.id);
+                            return (
+                              <tr
+                                key={caseItem.id}
+                                className="hover:bg-gray-50 cursor-pointer"
+                                onClick={() => toggleRow(caseItem.id)}
                               >
-                                <Share2 className="h-4 w-4 mr-1" />
-                                Share
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                                {/* Expand/Collapse Button */}
+                                <td className="border border-gray-300 px-4 py-3 text-center align-top">
+                                  {isExpanded ? (
+                                    <ChevronDown className="h-4 w-4 text-gray-500" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4 text-gray-500" />
+                                  )}
+                                </td>
+
+                                {/* Case No. */}
+                                <td className="border border-gray-300 px-4 py-3 align-top">
+                                  <div className="text-sm font-medium">
+                                    {caseItem.caseNumber}
+                                  </div>
+                                </td>
+
+                                {/* Case Title */}
+                                <td className="border border-gray-300 px-4 py-3 align-top">
+                                  <div>
+                                    <h3 className="font-bold mb-1">
+                                      {caseItem.title}
+                                    </h3>
+                                    {isExpanded && (
+                                      <p className="text-sm text-gray-600 mb-2">
+                                        {caseItem.summary}
+                                      </p>
+                                    )}
+                                  </div>
+                                </td>
+
+                                {/* Court */}
+                                <td className="border border-gray-300 px-4 py-3 align-top">
+                                  <div className="flex items-center gap-1">
+                                    <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                                    <span className="text-sm font-medium">
+                                      {caseItem.court}
+                                    </span>
+                                  </div>
+                                </td>
+
+                                {/* Bench */}
+                                <td className="border border-gray-300 px-4 py-3 align-top">
+                                  <div className="text-sm">
+                                    {caseItem.bench}
+                                  </div>
+                                </td>
+
+                                {/* Date */}
+                                <td className="border border-gray-300 px-4 py-3 align-top">
+                                  <div className="space-y-2">
+                                    <div className="flex items-center gap-1">
+                                      <Calendar className="h-4 w-4 text-gray-500" />
+                                      <span className="text-sm">
+                                        {new Date(
+                                          caseItem.date
+                                        ).toLocaleDateString()}
+                                      </span>
+                                    </div>
+                                    {isExpanded && (
+                                      <Badge
+                                        className={getOutcomeColor(
+                                          caseItem.outcome
+                                        )}
+                                      >
+                                        {caseItem.outcome
+                                          .replace("_", " ")
+                                          .toUpperCase()}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </td>
+
+                                {/* Tags */}
+                                <td className="border border-gray-300 px-4 py-3 align-top">
+                                  <div className="space-y-2">
+                                    <div className="space-y-1">
+                                      <Badge
+                                        className={getCategoryColor(
+                                          caseItem.category
+                                        )}
+                                      >
+                                        {caseItem.category}
+                                      </Badge>
+                                    </div>
+                                    {isExpanded &&
+                                      caseItem.keywords.length > 0 && (
+                                        <div className="flex flex-wrap gap-1">
+                                          {caseItem.keywords.map(
+                                            (keyword, index) => (
+                                              <Badge
+                                                key={index}
+                                                variant="outline"
+                                              >
+                                                {keyword}
+                                              </Badge>
+                                            )
+                                          )}
+                                        </div>
+                                      )}
+                                  </div>
+                                </td>
+
+                                {/* Actions */}
+                                <td className="border border-gray-300 px-4 py-3 align-top">
+                                  <div className="flex flex-col gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="w-full"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        window.open(caseItem.url, "_blank");
+                                      }}
+                                    >
+                                      <Eye className="h-4 w-4 mr-1" />
+                                      View
+                                    </Button>
+                                    {isExpanded && (
+                                      <>
+                                        {caseItem.pdfUrl && (
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="w-full"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              window.open(
+                                                caseItem.pdfUrl,
+                                                "_blank"
+                                              );
+                                            }}
+                                          >
+                                            <Download className="h-4 w-4 mr-1" />
+                                            Download
+                                          </Button>
+                                        )}
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="w-full"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          <Share2 className="h-4 w-4 mr-1" />
+                                          Share
+                                        </Button>
+                                      </>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
                     </tbody>
                   </table>
                 </div>
@@ -1106,41 +1029,35 @@ useEffect(() => {
             </div>
           </TabsContent>
         </Tabs>
-
       </main>
 
+      <div className="flex justify-between items-center mt-4">
+        <span className="text-sm text-gray-600">
+          Showing page {currentPage}
+        </span>
 
-<div className="flex justify-between items-center mt-4">
-  <span className="text-sm text-gray-600">Showing page {currentPage}</span>
+        <nav className="inline-flex space-x-2">
+          <button
+            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+            className="px-3 py-1 border rounded disabled:opacity-50"
+            disabled={currentPage === 1}
+          >
+            Previous
+          </button>
 
-  <nav className="inline-flex space-x-2">
-    <button
-      onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-      className="px-3 py-1 border rounded disabled:opacity-50"
-      disabled={currentPage === 1}
-    >
-      Previous
-    </button>
+          <span className="px-4 py-1 border rounded font-semibold text-blue-700 bg-gray-100">
+            {currentPage}
+          </span>
 
-  <span className="px-4 py-1 border rounded font-semibold text-blue-700 bg-gray-100">
-    {currentPage}
-  </span>
-
-    <button
-      onClick={() => setCurrentPage((prev) => prev + 1)}
-      className="px-3 py-1 border rounded disabled:opacity-50"
-      disabled={lastPageReached}
-    >
-      Next
-    </button>
-  </nav>
-</div>
-
-
-
-
-
-
+          <button
+            onClick={() => setCurrentPage((prev) => prev + 1)}
+            className="px-3 py-1 border rounded disabled:opacity-50"
+            disabled={lastPageReached}
+          >
+            Next
+          </button>
+        </nav>
+      </div>
     </div>
   );
 }
