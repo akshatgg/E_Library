@@ -731,7 +731,7 @@ export function CaseLawsDashboard() {
                               {Array.from({ length: 8 }).map((__, colIdx) => (
                                 <td
                                   key={colIdx}
-                                  className="border border-gray-300 px-4 py-3 align-top"
+                                  className="border border-gray-300 px-4 py-3 h-12"
                                 >
                                   <Skeleton className="h-4 w-full" />
                                 </td>
@@ -743,7 +743,9 @@ export function CaseLawsDashboard() {
                             return (
                               <tr
                                 key={caseItem.id}
-                                className="hover:bg-gray-50 cursor-pointer"
+                                className={`hover:bg-gray-50 cursor-pointer ${
+                                  isExpanded ? "bg-gray-50" : ""
+                                }`}
                                 onClick={() => toggleRow(caseItem.id)}
                               >
                                 {/* Expand/Collapse Button */}
@@ -757,54 +759,68 @@ export function CaseLawsDashboard() {
 
                                 {/* Case No. */}
                                 <td className="border border-gray-300 px-4 py-3 align-top">
-                                  <div className="text-sm font-medium">
+                                  <div className="text-sm font-medium truncate">
                                     {caseItem.caseNumber}
                                   </div>
+                                  
                                 </td>
 
                                 {/* Case Title */}
-                                <td className="border border-gray-300 px-4 py-3 align-top">
-                                  <div>
-                                    <h3 className="font-bold mb-1">
-                                      {caseItem.title}
-                                    </h3>
-                                    {isExpanded && (
-                                      <p className="text-sm text-gray-600 mb-2">
-                                        {caseItem.summary}
-                                      </p>
-                                    )}
+                                <td className="border border-gray-300 px-4 py-3 align-top max-w-xs">
+                                  <div
+                                    className={`font-bold text-sm ${
+                                      !isExpanded ? "truncate" : ""
+                                    }`}
+                                    title={caseItem.title}
+                                  >
+                                    {caseItem.title}
                                   </div>
+                                  {isExpanded && (
+                                    <p className="text-sm text-gray-600 mt-2">
+                                      {caseItem.summary}
+                                    </p>
+                                  )}
                                 </td>
 
                                 {/* Court */}
-                                <td className="border border-gray-300 px-4 py-3 align-top">
+                                <td className="border border-gray-300 px-4 py-3 align-top max-w-32">
                                   <div className="flex items-center gap-1">
                                     <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                                    <span className="text-sm font-medium">
+                                    <span
+                                      className={`text-sm font-medium ${
+                                        !isExpanded ? "truncate" : ""
+                                      }`}
+                                      title={caseItem.court}
+                                    >
                                       {caseItem.court}
                                     </span>
                                   </div>
                                 </td>
 
                                 {/* Bench */}
-                                <td className="border border-gray-300 px-4 py-3 align-top">
-                                  <div className="text-sm">
+                                <td className="border border-gray-300 px-4 py-3 align-top max-w-32">
+                                  <div
+                                    className={`text-sm ${
+                                      !isExpanded ? "truncate" : ""
+                                    }`}
+                                    title={caseItem.bench}
+                                  >
                                     {caseItem.bench}
                                   </div>
                                 </td>
 
                                 {/* Date */}
                                 <td className="border border-gray-300 px-4 py-3 align-top">
-                                  <div className="space-y-2">
-                                    <div className="flex items-center gap-1">
-                                      <Calendar className="h-4 w-4 text-gray-500" />
-                                      <span className="text-sm">
-                                        {new Date(
-                                          caseItem.date
-                                        ).toLocaleDateString()}
-                                      </span>
-                                    </div>
-                                    {isExpanded && (
+                                  <div className="flex items-center gap-1">
+                                    <Calendar className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                                    <span className="text-sm whitespace-nowrap">
+                                      {new Date(
+                                        caseItem.date
+                                      ).toLocaleDateString()}
+                                    </span>
+                                  </div>
+                                  {isExpanded && (
+                                    <div className="mt-2">
                                       <Badge
                                         className={getOutcomeColor(
                                           caseItem.outcome
@@ -814,22 +830,20 @@ export function CaseLawsDashboard() {
                                           .replace("_", " ")
                                           .toUpperCase()}
                                       </Badge>
-                                    )}
-                                  </div>
+                                    </div>
+                                  )}
                                 </td>
 
                                 {/* Tags */}
-                                <td className="border border-gray-300 px-4 py-3 align-top">
-                                  <div className="space-y-2">
-                                    <div className="space-y-1">
-                                      <Badge
-                                        className={getCategoryColor(
-                                          caseItem.category
-                                        )}
-                                      >
-                                        {caseItem.category}
-                                      </Badge>
-                                    </div>
+                                <td className="border border-gray-300 px-4 py-3 align-top max-w-28">
+                                  <div className="space-y-1">
+                                    <Badge
+                                      className={`${getCategoryColor(
+                                        caseItem.category
+                                      )} text-xs`}
+                                    >
+                                      {caseItem.category}
+                                    </Badge>
                                     {isExpanded &&
                                       caseItem.keywords.length > 0 && (
                                         <div className="flex flex-wrap gap-1">
@@ -838,6 +852,7 @@ export function CaseLawsDashboard() {
                                               <Badge
                                                 key={index}
                                                 variant="outline"
+                                                className="text-xs"
                                               >
                                                 {keyword}
                                               </Badge>
@@ -850,11 +865,11 @@ export function CaseLawsDashboard() {
 
                                 {/* Actions */}
                                 <td className="border border-gray-300 px-4 py-3 align-top">
-                                  <div className="flex flex-col gap-2">
+                                  <div className="flex flex-col gap-1">
                                     <Button
                                       size="sm"
                                       variant="outline"
-                                      className="w-full"
+                                      className="h-8 px-2"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         window.open(caseItem.url, "_blank");
@@ -869,7 +884,7 @@ export function CaseLawsDashboard() {
                                           <Button
                                             size="sm"
                                             variant="outline"
-                                            className="w-full"
+                                            className="h-8 px-2"
                                             onClick={(e) => {
                                               e.stopPropagation();
                                               window.open(
@@ -879,13 +894,13 @@ export function CaseLawsDashboard() {
                                             }}
                                           >
                                             <Download className="h-4 w-4 mr-1" />
-                                            Download
+                                            PDF
                                           </Button>
                                         )}
                                         <Button
                                           size="sm"
                                           variant="outline"
-                                          className="w-full"
+                                          className="h-8 px-2"
                                           onClick={(e) => e.stopPropagation()}
                                         >
                                           <Share2 className="h-4 w-4 mr-1" />
