@@ -1,7 +1,7 @@
 // indiankanoonAPI.ts
 import axios from "axios";
 
-const INDIAN_KANOON_TOKEN = "d58940b08012f775f02a5f61063222a844ad3e24";
+const INDIAN_KANOON_TOKEN = "f2d529bf4346005f6a35b7c011679c04886ae391";
 const INDIAN_KANOON_ENDPOINT = "https://api.indiankanoon.org";
 
 export interface IKanoonResult {
