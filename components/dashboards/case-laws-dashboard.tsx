@@ -835,7 +835,7 @@ export function CaseLawsDashboard() {
                                 </td>
 
                                 {/* Tags */}
-                                <td className="border border-gray-300 px-4 py-3 align-top max-w-28">
+                                <td className="border border-gray-300 px-4 py-3 align-top max-w-36">
                                   <div className="space-y-1">
                                     <Badge
                                       className={`${getCategoryColor(
