@@ -40,12 +40,13 @@ export async function fetchIndianKanoonData(props: FetchKanoonProps = {}): Promi
       params,
       {
         headers: {
-          Authorization: `Token d58940b08012f775f02a5f61063222a844ad3e24`,
+          Authorization: `Token ${INDIAN_KANOON_TOKEN}`,
           Accept: "application/json",
           "Content-Type": "application/x-www-form-urlencoded",
         },
       }
     );
+console.log("Response Data:", response.data);
 
     return response.data?.docs || [];
   } catch (error) {
