@@ -358,47 +358,7 @@ useEffect(() => {
       colors[outcome as keyof typeof colors] || "bg-gray-100 text-gray-800"
     );
   };
-useEffect(() => {
-  const fetchTotalCount = async () => {
-    try {
-      setLoading(true);
 
-      const formInput = getFormInputByCategory(selectedCategory);
-      const encodedFormInput = encodeURIComponent(formInput);
-
-      // Build the API URL dynamically
-      let countUrl = `/api/cases/total-pages?formInput=${encodedFormInput}`;
-      if (selectedYear !== "all") {
-        countUrl += `&year=${selectedYear}`;
-      }
-
-      const res = await fetch(countUrl);
-      const json = await res.json();
-
-      console.log("Total count response:", json);
-
-      if (json.success) {
-        const totalItems = json.data;
-        console.log("Total items found:", totalItems);
-        setFoundText(totalItems);
-        console.log("Found text:", foundText);
-        
-        
-        
-        setTotalPages(Math.ceil(totalItems / 10)); // 🧮 assuming 10 results per page
-      } else {
-        console.warn("Total count not found in response");
-      }
-    } catch (error) {
-      console.error("Error fetching total count:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  fetchTotalCount();
-}, [selectedCategory, selectedYear,foundText]);
-    
   const totalcasescount=categoryCounts["ITAT"] +categoryCounts["GST"] + categoryCounts["INCOME_TAX"] + categoryCounts["HIGH_COURT"] + categoryCounts["SUPREME_COURT"];
   const stats = [
     {
@@ -604,12 +564,25 @@ useEffect(() => {
 
             {/* Search Results */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-gray-600">
-                  Found {foundText} case
-                  {filteredCases.length !== 1 ? "s" : ""}
-                </p>
-              </div>
+    <div className="space-y-1 text-sm text-gray-700">
+  {selectedCategory === "all" ? (
+   
+    <div className="flex justify-between">
+      <span>Found: {totalcasescount} cases</span>
+     
+    </div>
+    
+  ) : (
+    <div className="flex justify-between">
+      <span>Found: {(categoryCounts[selectedCategory] ?? 0).toLocaleString()} case
+        {(categoryCounts[selectedCategory] ?? 0) !== 1 ? "s" : ""}
+      </span>
+    </div>
+  )}
+</div>
+
+
+
 
               {loading ? (
                 <div className="space-y-4">
