@@ -1,6 +1,6 @@
 "use client"
 import { auth,getUserDataFromFirestore  } from "@/lib/firebase";
-
+import Chatbot from "@/components/chatbot/index";
 import { useEffect,useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -110,9 +110,9 @@ useEffect(() => {
           </div>
         </div>
       </header>
-
       {/* Main Content */}
       <main className="flex-1">
+
         {/* Hero Section */}
         <section className="py-20 px-4">
           <div className="max-w-7xl mx-auto text-center">
@@ -251,7 +251,7 @@ useEffect(() => {
           </div>
         </section>
       </main>
-
+     <Chatbot />
       {/* Fixed Footer */}
       <footer className="bg-gray-900 dark:bg-gray-950 text-white py-12 mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -266,6 +266,7 @@ useEffect(() => {
               <p className="text-gray-400 mb-4">
                 Revolutionary legal technology platform powered by AI and quantum computing principles.
               </p>
+         
               <div className="flex space-x-4">
                 <Button variant="outline" size="sm">
                   <Mail className="w-4 h-4" />
