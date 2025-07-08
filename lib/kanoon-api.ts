@@ -3,7 +3,7 @@ import axios from "axios";
 
 
 
-const INDIAN_KANOON_TOKEN = process.env.NEXT_PUBLIC_KANOON_TOKEN;
+const INDIAN_KANOON_TOKEN = process.env.NEXT_PUBLIC_KANOON_TOKEN||"";
 
 const INDIAN_KANOON_ENDPOINT = process.env.NEXT_PUBLIC_KANOON_URL || "https://api.indiankanoon.org";
 
