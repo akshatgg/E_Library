@@ -2,7 +2,8 @@
 import axios from "axios";
 
 
-const INDIAN_KANOON_TOKEN = "f2d529bf4346005f6a35b7c011679c04886ae391";
+
+const INDIAN_KANOON_TOKEN = "94eafebe791061b36a2071fc993acd0f05acb2f3";
 
 const INDIAN_KANOON_ENDPOINT = "https://api.indiankanoon.org";
 
@@ -59,44 +60,70 @@ console.log("Response Data:", response.data);
 
 
 
-export async function fetchIndianKanoonTotalPages(): Promise<number> {
-  try {
-    const response = await axios.get(`${INDIAN_KANOON_ENDPOINT}total_pages/`, {
-      headers: {
-        Authorization: `Token ${INDIAN_KANOON_TOKEN}`,
-        Accept: "application/json",
-      },
-    });
-
-    return response.data?.total_pages || 0;
-  } catch (error) {
-    console.error("Error fetching total pages from Indian Kanoon:", error);
-    return 0;
-  }
-}
-
 
 export async function fetchCaseByTid(tid: number): Promise<any> {
-
   try {
-    const response = await axios.post(`INDIAN_KANOON_ENDPOINT/doc/${tid}`, {
-      headers: {
-        'Authorization': `Token ${INDIAN_KANOON_TOKEN}`,
-        'Accept': 'application/json',
-      },
-    });
-
-    if (response.status < 200 || response.status >= 300) {
-      throw new Error(`Error fetching TID ${tid}: ${response.statusText}`);
+    // Add extensive debugging
+    console.log("=== DEBUG fetchCaseByTid ===");
+    console.log("Input TID:", tid);
+    console.log("TID type:", typeof tid);
+    console.log("TID is number?", typeof tid === 'number');
+    console.log("TID is NaN?", isNaN(tid));
+    
+    // Construct URL step by step
+    const baseUrl = INDIAN_KANOON_ENDPOINT;
+    const fullUrl = `${baseUrl}/doc/${tid}/`;
+    
+    console.log("Base URL:", baseUrl);
+    console.log("Full URL:", fullUrl);
+    console.log("Token (first 10 chars):", INDIAN_KANOON_TOKEN.substring(0, 10) + "...");
+    
+    // Validate TID before making request
+    if (!tid || isNaN(tid) || tid <= 0) {
+      throw new Error(`Invalid TID: ${tid}`);
     }
+    
+    console.log("Making POST request to:", fullUrl);
+    
+    const response = await axios.post(
+      fullUrl,
+      {}, // Empty data body for POST
+      {
+        headers: {
+          Authorization: `Token ${INDIAN_KANOON_TOKEN}`,
+          Accept: "application/json",
+        },
+      }
+    );
 
+    console.log("✅ Success! Response status:", response.status);
+    console.log("Response data keys:", Object.keys(response.data || {}));
+    
     return response.data;
   } catch (error: any) {
-    console.error('Error in fetchCaseByTid:', error.message);
-    throw error;
+    console.error("❌ Error in fetchCaseByTid:");
+    console.error("Error message:", error.message);
+    
+    if (error.response) {
+      console.error("Response status:", error.response.status);
+      console.error("Response statusText:", error.response.statusText);
+      console.error("Response data:", error.response.data);
+      console.error("Response headers:", error.response.headers);
+      
+      // Log the actual URL that failed
+      console.error("Failed URL:", error.config?.url);
+      
+      throw new Error(`API Error ${error.response.status}: ${error.response.statusText} - ${JSON.stringify(error.response.data)}`);
+    } else if (error.request) {
+      console.error("No response received");
+      console.error("Request config:", error.request);
+      throw new Error("No response from Indian Kanoon API");
+    } else {
+      console.error("Request setup error:", error.message);
+      throw new Error(`Request setup error: ${error.message}`);
+    }
   }
 }
-
 
 
 export async function fetchTotalCountByCategory(props: FetchKanoonProps): Promise<number> {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,10 +30,12 @@ import {
   FormInput,
   ChevronDown,
   ChevronRight,
+  Link,
 } from "lucide-react";
 import { toast } from "sonner";
-import { ca, el } from "date-fns/locale";
-import { log } from "util";
+
+import { useRouter } from "next/navigation";
+
 
 interface CaseData {
   id: string;
@@ -79,6 +81,10 @@ export function CaseLawsDashboard() {
   const [totalPages, setTotalPages] = useState(1); // will increase dynamically
   const [lastPageReached, setLastPageReached] = useState(false);
   const [expandedRows, setExpandedRows] = useState(new Set());
+
+
+const router = useRouter();
+
 
   const maxButtons = 10;
   const startPage = Math.floor((currentPage - 1) / maxButtons) * maxButtons + 1;
@@ -215,7 +221,6 @@ export function CaseLawsDashboard() {
           setLoading(false);
           return;
         }
-
         const mappedCases = json.data.map((item: any, idx: number) => {
           const cleanHeadline = item.headline?.replace(/<[^>]+>/g, "") ?? "";
           const cleanTitle = item.title?.replace(/<[^>]+>/g, "") ?? "";
@@ -818,18 +823,20 @@ export function CaseLawsDashboard() {
                                 {/* Actions */}
                                 <td className="border border-gray-300 px-4 py-3 align-top">
                                   <div className="flex flex-col gap-1">
+                                  
                                     <Button
                                       size="sm"
                                       variant="outline"
                                       className="h-8 px-2"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        window.open(caseItem.url, "_blank");
-                                      }}
+                                     onClick={(e) => {
+    e.stopPropagation(); // prevent row toggle
+    router.push(`/case-laws/${caseItem.caseNumber}`); // navigate to dynamic route
+  }}
                                     >
                                       <Eye className="h-4 w-4 mr-1" />
                                       View
                                     </Button>
+                                   
                                     {isExpanded && (
                                       <>
                                         {caseItem.pdfUrl && (
