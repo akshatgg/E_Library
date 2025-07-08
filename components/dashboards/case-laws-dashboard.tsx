@@ -879,131 +879,152 @@ const router = useRouter();
             </div>
           </TabsContent>
 
-          <TabsContent value="browse" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {["ITAT", "GST", "INCOME_TAX", "HIGH_COURT", "SUPREME_COURT"].map(
-                (category) => (
-                  <Card
-                    key={category}
-                    className="hover:shadow-lg transition-shadow cursor-pointer"
-                  >
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Gavel className="h-5 w-5" />
-                        {category.replace("_", " ")}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        <p className="text-2xl font-bold">
-                          {categoryCounts[category] ?? 0}
-                        </p>
-                        <p className="text-sm text-gray-600">Available cases</p>
+   <TabsContent value="browse" className="space-y-6">
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {statsLoading
+      ? Array.from({ length: 5 }).map((_, idx) => (
+          <Card key={`skeleton-${idx}`} className="p-6 space-y-4 animate-pulse">
+            <div className="h-5 w-1/2 bg-gray-300 rounded" />
+            <div className="h-8 w-1/3 bg-gray-300 rounded" />
+            <div className="h-10 w-full bg-gray-200 rounded mt-2" />
+          </Card>
+        ))
+      : ["ITAT", "GST", "INCOME_TAX", "HIGH_COURT", "SUPREME_COURT"].map((category) => (
+          <Card key={category} className="hover:shadow-lg transition-shadow cursor-pointer">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Gavel className="h-5 w-5" />
+                {category.replace("_", " ")}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <p className="text-2xl font-bold">
+                  {categoryCounts[category] ?? 0}
+                </p>
+                <p className="text-sm text-gray-600">Available cases</p>
 
-                        <Button
-                          variant="outline"
-                          className="w-full"
-                          onClick={() => {
-                            setSelectedCategory(category);
-                            // Switch to search tab
-                          }}
-                        >
-                          Browse Cases
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
-              )}
-            </div>
-          </TabsContent>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setSelectedCategory(category);
+                    // Switch to search tab if needed
+                  }}
+                >
+                  Browse Cases
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+  </div>
+</TabsContent>
+
 
           <TabsContent value="analytics" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Case Distribution by Category</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {[
-                      "ITAT",
-                      "GST",
-                      "INCOME_TAX",
-                      "HIGH_COURT",
-                      "SUPREME_COURT",
-                    ].map((category) => {
-                      const count = categoryCounts[category] ?? 0;
-                      const percentage =
-                        totalcasescount > 0
-                          ? (count / totalcasescount) * 100
-                          : 0;
+            <Card>
+  <CardHeader>
+    <CardTitle>Case Distribution by Category</CardTitle>
+  </CardHeader>
+  <CardContent>
+    {statsLoading ? (
+      <div className="space-y-4">
+        {Array.from({ length: 5 }).map((_, idx) => (
+          <div key={idx} className="space-y-2">
+            <div className="flex justify-between">
+              <div className="w-24 h-4 bg-gray-200 rounded" />
+              <div className="w-16 h-4 bg-gray-200 rounded" />
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2" />
+          </div>
+        ))}
+      </div>
+    ) : (
+      <div className="space-y-4">
+        {["ITAT", "GST", "INCOME_TAX", "HIGH_COURT", "SUPREME_COURT"].map((category) => {
+          const count = categoryCounts[category] ?? 0;
+          const percentage = totalcasescount > 0 ? (count / totalcasescount) * 100 : 0;
 
-                      return (
-                        <div key={category} className="space-y-2">
-                          <div className="flex justify-between">
-                            <span className="text-sm font-medium">
-                              {category.replace("_", " ")}
-                            </span>
-                            <span className="text-sm text-gray-600">
-                              {count.toLocaleString()} ({percentage.toFixed(1)}
-                              %)
-                            </span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div
-                              className="bg-blue-600 h-2 rounded-full"
-                              style={{ width: `${percentage}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
+          return (
+            <div key={category} className="space-y-2">
+              <div className="flex justify-between">
+                <span className="text-sm font-medium">
+                  {category.replace("_", " ")}
+                </span>
+                <span className="text-sm text-gray-600">
+                  {count.toLocaleString()} ({percentage.toFixed(1)}%)
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-blue-600 h-2 rounded-full"
+                  style={{ width: `${percentage}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    )}
+  </CardContent>
+</Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Outcome Analysis</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {["allowed", "dismissed", "partly_allowed"].map(
-                      (outcome) => {
-                        const count = cases.filter(
-                          (c) => c.outcome === outcome
-                        ).length;
-                        const percentage = (count / cases.length) * 100;
-                        return (
-                          <div key={outcome} className="space-y-2">
-                            <div className="flex justify-between">
-                              <span className="text-sm font-medium">
-                                {outcome.replace("_", " ").toUpperCase()}
-                              </span>
-                              <span className="text-sm text-gray-600">
-                                {count} ({percentage.toFixed(1)}%)
-                              </span>
-                            </div>
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div
-                                className={`h-2 rounded-full ${
-                                  outcome === "allowed"
-                                    ? "bg-green-600"
-                                    : outcome === "dismissed"
-                                    ? "bg-red-600"
-                                    : "bg-yellow-600"
-                                }`}
-                                style={{ width: `${percentage}%` }}
-                              ></div>
-                            </div>
-                          </div>
-                        );
-                      }
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+
+            <Card>
+  <CardHeader>
+    <CardTitle>Outcome Analysis</CardTitle>
+  </CardHeader>
+  <CardContent>
+    {statsLoading ? (
+      <div className="space-y-4">
+        {Array.from({ length: 3 }).map((_, idx) => (
+          <div key={idx} className="space-y-2">
+            <div className="flex justify-between">
+              <div className="w-24 h-4 bg-gray-200 rounded" />
+              <div className="w-16 h-4 bg-gray-200 rounded" />
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2" />
+          </div>
+        ))}
+      </div>
+    ) : (
+      <div className="space-y-4">
+        {["allowed", "dismissed", "partly_allowed"].map((outcome) => {
+          const count = cases.filter((c) => c.outcome === outcome).length;
+          const percentage = (count / cases.length) * 100;
+
+          return (
+            <div key={outcome} className="space-y-2">
+              <div className="flex justify-between">
+                <span className="text-sm font-medium">
+                  {outcome.replace("_", " ").toUpperCase()}
+                </span>
+                <span className="text-sm text-gray-600">
+                  {count} ({percentage.toFixed(1)}%)
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className={`h-2 rounded-full ${
+                    outcome === "allowed"
+                      ? "bg-green-600"
+                      : outcome === "dismissed"
+                      ? "bg-red-600"
+                      : "bg-yellow-600"
+                  }`}
+                  style={{ width: `${percentage}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    )}
+  </CardContent>
+</Card>
+
             </div>
           </TabsContent>
         </Tabs>
