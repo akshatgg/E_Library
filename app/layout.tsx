@@ -5,6 +5,7 @@ import { ThemeProvider } from "next-themes"
 import { AuthProvider } from "@/components/auth-provider"
 import { Toaster } from "@/components/ui/toaster"
 import "./globals.css"
+import AppLayouts from "@/layouts/AppLayouts"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -24,8 +25,10 @@ export default function RootLayout({
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
           <AuthProvider>
+          <AppLayouts>
             {children}
             <Toaster />
+          </AppLayouts>
           </AuthProvider>
         </ThemeProvider>
       </body>

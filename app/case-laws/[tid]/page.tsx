@@ -155,15 +155,7 @@ const router = useRouter();
     <div className="min-h-screen bg-gray-50">
 
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-  <button
-    onClick={() => router.back()}
-    className="inline-flex items-center text-sm font-medium text-blue-600 hover:underline"
-  >
-    <ArrowLeft className="w-4 h-4 mr-2" />
-    Back to Previous
-  </button>
-</div>
+
 
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
