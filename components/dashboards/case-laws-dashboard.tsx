@@ -70,16 +70,21 @@ export function CaseLawsDashboard() {
   const [selectedOutcome, setSelectedOutcome] = useState<string>("all");
   const [selectedYear, setSelectedYear] = useState<string>("all");
   const [selectedSection, setSelectedSection] = useState<string>("all");
-const [foundText, setFoundText] = useState<string | null>(null);
-const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
-const [overallTotal, setOverallTotal] = useState<number>(0);
+  const [foundText, setFoundText] = useState<string | null>(null);
+  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>(
+    {}
+  );
+  const [overallTotal, setOverallTotal] = useState<number>(0);
+  const [statsLoading, setStatsLoading] = useState(true);
 
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1); // will increase dynamically
   const [lastPageReached, setLastPageReached] = useState(false);
   const [expandedRows, setExpandedRows] = useState(new Set());
 
+
 const router = useRouter();
+
 
   const maxButtons = 10;
   const startPage = Math.floor((currentPage - 1) / maxButtons) * maxButtons + 1;
@@ -93,7 +98,7 @@ const router = useRouter();
     }
     setExpandedRows(newExpandedRows);
   };
-  
+
   const getFormInputByCategory = (category: string): string => {
     if (selectedYear == "all") {
       switch (category) {
@@ -111,8 +116,8 @@ const router = useRouter();
           return "(tribunal)";
         case "all":
         default:
-          return "(gst OR income tax OR ITAT)"           
-        }
+          return "(gst OR income tax OR ITAT)";
+      }
     } else {
       switch (category) {
         case "ITAT":
@@ -129,7 +134,7 @@ const router = useRouter();
           return `(tribunal OR appellate authority) AND year:${selectedYear}`;
         case "all":
         default:
-          return "(gst OR income tax OR income tax appellate tribunal )"           
+          return "(gst OR income tax OR income tax appellate tribunal )";
       }
     }
   };
@@ -145,49 +150,49 @@ const router = useRouter();
     return "OTHER";
   };
 
-  
+  useEffect(() => {
+    const fetchAllCategoryCounts = async () => {
+      setStatsLoading(true);
+      const categories = [
+        "ITAT",
+        "GST",
+        "INCOME_TAX",
+        "HIGH_COURT",
+        "SUPREME_COURT",
+      ];
+      const counts: Record<string, number> = {};
+      let total = 0;
 
-useEffect(() => {
-  const fetchAllCategoryCounts = async () => {
-    const categories = ["ITAT", "GST", "INCOME_TAX", "HIGH_COURT", "SUPREME_COURT"];
-    const counts: Record<string, number> = {};
-    let total = 0;
+      for (const cat of categories) {
+        const formInput = encodeURIComponent(getFormInputByCategory(cat));
+        let url = `/api/cases/total-pages?formInput=${formInput}`;
+        if (selectedYear !== "all") {
+          url += `&year=${selectedYear}`;
+        }
 
-    for (const cat of categories) {
-      const formInput = encodeURIComponent(getFormInputByCategory(cat));
-      let url = `/api/cases/total-pages?formInput=${formInput}`;
-      if (selectedYear !== "all") {
-        url += `&year=${selectedYear}`;
-      }
+        try {
+          const res = await fetch(url);
+          const json = await res.json();
 
-      try {
-        const res = await fetch(url);
-        const json = await res.json();
-
-
-        
-        if (json.success) {
-          counts[cat] = json.data;
-          total += json.data;
-        } else {
+          if (json.success) {
+            counts[cat] = json.data;
+            total += json.data;
+          } else {
+            counts[cat] = 0;
+          }
+        } catch (err) {
+          console.error(`Failed for ${cat}`, err);
           counts[cat] = 0;
         }
-      } catch (err) {
-        console.error(`Failed for ${cat}`, err);
-        counts[cat] = 0;
       }
-    }
 
-    setCategoryCounts(counts);
-    setOverallTotal(total);
-  };
+      setCategoryCounts(counts);
+      setOverallTotal(total);
+      setStatsLoading(false);
+    };
 
-  fetchAllCategoryCounts();
-}, [selectedYear]);
-
-
-
-
+    fetchAllCategoryCounts();
+  }, [selectedYear]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -209,11 +214,7 @@ useEffect(() => {
 
         const res = await fetch(apiUrl);
 
-        
-
         const json = await res.json();
-
-
 
         if (!json.success || !Array.isArray(json.data)) {
           console.error("Invalid API response format", json);
@@ -259,7 +260,7 @@ useEffect(() => {
   useEffect(() => {
     filterCases();
   }, [
-    searchQuery,
+    // searchQuery,
     selectedCategory,
     selectedCourt,
     selectedOutcome,
@@ -322,16 +323,50 @@ useEffect(() => {
   const searchCases = async (query: string) => {
     setLoading(true);
     try {
-      // Simulate API call to Indian Kanoon or other legal databases
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const encodedQuery = encodeURIComponent(query.trim());
 
-      // In real implementation, this would call actual APIs
-      // const response = await fetch(`/api/case-laws/search?q=${encodeURIComponent(query)}`)
-      // const data = await response.json()
+      const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/case-laws?pagenum=0&formInput=${encodedQuery}`;
+      console.log(`api url: ${apiUrl}`);
 
-      toast.success(`Found ${filteredCases.length} cases matching your search`);
+      const res = await fetch(apiUrl);
+      const json = await res.json();
+
+      if (!json.success || !Array.isArray(json.data)) {
+        toast.error("No data found or API failed.");
+        return;
+      }
+
+      const mappedCases = json.data.map((item: any, idx: number) => {
+        const cleanHeadline = item.headline?.replace(/<[^>]+>/g, "") ?? "";
+        const cleanTitle = item.title?.replace(/<[^>]+>/g, "") ?? "";
+        return {
+          id: item.tid?.toString() ?? String(idx),
+          title: cleanTitle,
+          court: item.docsource ?? "Unknown",
+          date: item.publishdate ?? "",
+          bench: item.bench ?? "",
+          category: mapDocSourceToCategory(item.docsource ?? ""),
+          outcome: "allowed",
+          parties: {
+            appellant: "",
+            respondent: "",
+          },
+          caseNumber: `${item.tid}`,
+          summary: cleanHeadline,
+          relevantSections: [],
+          keywords: [],
+          legalPoints: [],
+          url: `https://indiankanoon.org/doc/${item.tid}`,
+        };
+      });
+
+      setCases(mappedCases); // Update cases for filtering and UI
+      setFilteredCases(mappedCases); // Optional: If filtering manually too
+      setCurrentPage(1); // Reset page
+      toast.success(`Found ${mappedCases.length} case(s).`);
     } catch (error) {
-      toast.error("Failed to search cases. Please try again.");
+      console.error("Search error:", error);
+      toast.error("Error during search. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -361,7 +396,12 @@ useEffect(() => {
     );
   };
 
-  const totalcasescount=categoryCounts["ITAT"] +categoryCounts["GST"] + categoryCounts["INCOME_TAX"] + categoryCounts["HIGH_COURT"] + categoryCounts["SUPREME_COURT"];
+  const totalcasescount =
+    categoryCounts["ITAT"] +
+    categoryCounts["GST"] +
+    categoryCounts["INCOME_TAX"] +
+    categoryCounts["HIGH_COURT"] +
+    categoryCounts["SUPREME_COURT"];
   const stats = [
     {
       label: "Total Cases",
@@ -420,16 +460,25 @@ useEffect(() => {
           {stats.map((stat, index) => (
             <Card key={index}>
               <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">
-                      {stat.label}
-                    </p>
-                    <p className={`text-3xl font-bold ${stat.color}`}>
-                      {stat.value}
-                    </p>
+                <div>
+                  <p className="text-sm font-medium text-gray-600">
+                    {stat.label}
+                  </p>
+                  <div className="flex items-center justify-between mt-2">
+                    {statsLoading ? (
+                      <>
+                        <Skeleton className="h-8 w-20" />
+                        <Skeleton className="h-8 w-8" />
+                      </>
+                    ) : (
+                      <>
+                        <p className={`text-3xl font-bold ${stat.color}`}>
+                          {stat.value}
+                        </p>
+                        <stat.icon className={`h-8 w-8 ${stat.color}`} />
+                      </>
+                    )}
                   </div>
-                  <stat.icon className={`h-8 w-8 ${stat.color}`} />
                 </div>
               </CardContent>
             </Card>
@@ -566,25 +615,22 @@ useEffect(() => {
 
             {/* Search Results */}
             <div className="space-y-4">
-    <div className="space-y-1 text-sm text-gray-700">
-  {selectedCategory === "all" ? (
-   
-    <div className="flex justify-between">
-      <span>Found: {totalcasescount} cases</span>
-     
-    </div>
-    
-  ) : (
-    <div className="flex justify-between">
-      <span>Found: {(categoryCounts[selectedCategory] ?? 0).toLocaleString()} case
-        {(categoryCounts[selectedCategory] ?? 0) !== 1 ? "s" : ""}
-      </span>
-    </div>
-  )}
-</div>
-
-
-
+              <div className="space-y-1 text-sm text-gray-700">
+                {selectedCategory === "all" ? (
+                  <div className="flex justify-between">
+                    <span>Found: {totalcasescount} cases</span>
+                  </div>
+                ) : (
+                  <div className="flex justify-between">
+                    <span>
+                      Found:{" "}
+                      {(categoryCounts[selectedCategory] ?? 0).toLocaleString()}{" "}
+                      case
+                      {(categoryCounts[selectedCategory] ?? 0) !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                )}
+              </div>
 
               {loading ? (
                 <div className="space-y-4">
@@ -603,7 +649,6 @@ useEffect(() => {
                   ))}
                 </div>
               ) : (
-              
                 <div className="overflow-x-auto bg-white">
                   <table className="w-full border-collapse border border-gray-300 bg-white">
                     <thead>
@@ -675,7 +720,6 @@ useEffect(() => {
                                   <div className="text-sm font-medium truncate">
                                     {caseItem.caseNumber}
                                   </div>
-                                  
                                 </td>
 
                                 {/* Case Title */}
@@ -852,9 +896,9 @@ useEffect(() => {
                     <CardContent>
                       <div className="space-y-2">
                         <p className="text-2xl font-bold">
-  {categoryCounts[category] ?? 0}
-</p>
-<p className="text-sm text-gray-600">Available cases</p>
+                          {categoryCounts[category] ?? 0}
+                        </p>
+                        <p className="text-sm text-gray-600">Available cases</p>
 
                         <Button
                           variant="outline"
@@ -880,35 +924,43 @@ useEffect(() => {
                 <CardHeader>
                   <CardTitle>Case Distribution by Category</CardTitle>
                 </CardHeader>
-     <CardContent>
-  <div className="space-y-4">
-    {["ITAT", "GST", "INCOME_TAX", "HIGH_COURT", "SUPREME_COURT"].map((category) => {
-      const count = categoryCounts[category] ?? 0;
-      const percentage = totalcasescount > 0 ? (count / totalcasescount) * 100 : 0;
+                <CardContent>
+                  <div className="space-y-4">
+                    {[
+                      "ITAT",
+                      "GST",
+                      "INCOME_TAX",
+                      "HIGH_COURT",
+                      "SUPREME_COURT",
+                    ].map((category) => {
+                      const count = categoryCounts[category] ?? 0;
+                      const percentage =
+                        totalcasescount > 0
+                          ? (count / totalcasescount) * 100
+                          : 0;
 
-      return (
-        <div key={category} className="space-y-2">
-          <div className="flex justify-between">
-            <span className="text-sm font-medium">
-              {category.replace("_", " ")}
-            </span>
-            <span className="text-sm text-gray-600">
-              {count.toLocaleString()} ({percentage.toFixed(1)}%)
-            </span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div
-              className="bg-blue-600 h-2 rounded-full"
-              style={{ width: `${percentage}%` }}
-            ></div>
-          </div>
-        </div>
-      );
-    })}
-  </div>
-</CardContent>
-
-
+                      return (
+                        <div key={category} className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-sm font-medium">
+                              {category.replace("_", " ")}
+                            </span>
+                            <span className="text-sm text-gray-600">
+                              {count.toLocaleString()} ({percentage.toFixed(1)}
+                              %)
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-blue-600 h-2 rounded-full"
+                              style={{ width: `${percentage}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
               </Card>
 
               <Card>
