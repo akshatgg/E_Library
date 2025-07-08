@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,7 +36,6 @@ import { toast } from "sonner";
 
 import { useRouter } from "next/navigation";
 
-
 interface CaseData {
   id: string;
   title: string;
@@ -56,6 +55,25 @@ interface CaseData {
   legalPoints: string[];
   url: string;
   pdfUrl?: string;
+}
+
+// Cache interface
+interface CacheEntry {
+  data: CaseData[];
+  timestamp: number;
+}
+
+interface CacheKey {
+  page: number;
+  category: string;
+  year: string;
+}
+
+// Category count cache interface
+interface CategoryCountCacheEntry {
+  counts: Record<string, number>;
+  total: number;
+  timestamp: number;
 }
 
 const mockCases: CaseData[] = [];
@@ -82,12 +100,137 @@ export function CaseLawsDashboard() {
   const [lastPageReached, setLastPageReached] = useState(false);
   const [expandedRows, setExpandedRows] = useState(new Set());
 
+  const router = useRouter();
 
-const router = useRouter();
+  // Cache implementation
+  const cacheRef = useRef<Map<string, CacheEntry>>(new Map());
+  const categoryCountCacheRef = useRef<Map<string, CategoryCountCacheEntry>>(
+    new Map()
+  );
 
+  const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
 
   const maxButtons = 10;
   const startPage = Math.floor((currentPage - 1) / maxButtons) * maxButtons + 1;
+
+  // Helper function to generate cache key
+  const generateCacheKey = (
+    page: number,
+    category: string,
+    year: string
+  ): string => {
+    return `${page}-${category}-${year}`;
+  };
+
+  // Helper function to generate category count cache key
+  const generateCategoryCountCacheKey = (year: string): string => {
+    return `category-counts-${year}`;
+  };
+
+  // Helper function to check if cache entry is valid
+  const isCacheValid = (entry: CacheEntry): boolean => {
+    return Date.now() - entry.timestamp < CACHE_DURATION;
+  };
+
+  // Helper function to check if category count cache entry is valid
+  const isCategoryCountCacheValid = (
+    entry: CategoryCountCacheEntry
+  ): boolean => {
+    return Date.now() - entry.timestamp < CACHE_DURATION;
+  };
+
+  // Helper function to get data from cache
+  const getCachedData = (
+    page: number,
+    category: string,
+    year: string
+  ): CaseData[] | null => {
+    const cacheKey = generateCacheKey(page, category, year);
+    const cachedEntry = cacheRef.current.get(cacheKey);
+
+    if (cachedEntry && isCacheValid(cachedEntry)) {
+      console.log(
+        `Cache hit for page ${page}, category ${category}, year ${year}`
+      );
+      return cachedEntry.data;
+    }
+
+    // Remove expired cache entry
+    if (cachedEntry) {
+      cacheRef.current.delete(cacheKey);
+    }
+
+    return null;
+  };
+
+  // Helper function to get category counts from cache
+  const getCachedCategoryCounts = (
+    year: string
+  ): { counts: Record<string, number>; total: number } | null => {
+    const cacheKey = generateCategoryCountCacheKey(year);
+    const cachedEntry = categoryCountCacheRef.current.get(cacheKey);
+
+    if (cachedEntry && isCategoryCountCacheValid(cachedEntry)) {
+      console.log(`Category count cache hit for year ${year}`);
+      return {
+        counts: cachedEntry.counts,
+        total: cachedEntry.total,
+      };
+    }
+
+    // Remove expired cache entry
+    if (cachedEntry) {
+      categoryCountCacheRef.current.delete(cacheKey);
+    }
+
+    return null;
+  };
+
+  // Helper function to set data in cache
+  const setCachedData = (
+    page: number,
+    category: string,
+    year: string,
+    data: CaseData[]
+  ): void => {
+    const cacheKey = generateCacheKey(page, category, year);
+    const cacheEntry: CacheEntry = {
+      data: data,
+      timestamp: Date.now(),
+    };
+    cacheRef.current.set(cacheKey, cacheEntry);
+    console.log(
+      `Data cached for page ${page}, category ${category}, year ${year}`
+    );
+  };
+
+  // Helper function to set category counts in cache
+  const setCachedCategoryCounts = (
+    year: string,
+    counts: Record<string, number>,
+    total: number
+  ): void => {
+    const cacheKey = generateCategoryCountCacheKey(year);
+    const cacheEntry: CategoryCountCacheEntry = {
+      counts: counts,
+      total: total,
+      timestamp: Date.now(),
+    };
+    categoryCountCacheRef.current.set(cacheKey, cacheEntry);
+    console.log(`Category counts cached for year ${year}`);
+  };
+
+  // Helper function to clear cache when filters change
+  const clearCache = (): void => {
+    cacheRef.current.clear();
+    console.log("Cache cleared");
+  };
+
+  // Helper function to clear category count cache (optional - can be used for manual cache clearing)
+  const clearCategoryCountCache = (): void => {
+    categoryCountCacheRef.current.clear();
+    console.log("Category count cache cleared");
+  };
 
   const toggleRow = (caseId: string) => {
     const newExpandedRows = new Set(expandedRows);
@@ -153,6 +296,14 @@ const router = useRouter();
   useEffect(() => {
     const fetchAllCategoryCounts = async () => {
       setStatsLoading(true);
+      // Check cache first
+      const cachedCounts = getCachedCategoryCounts(selectedYear);
+      if (cachedCounts) {
+        setCategoryCounts(cachedCounts.counts);
+        setOverallTotal(cachedCounts.total);
+        setStatsLoading(false);
+        return;
+      }
       const categories = [
         "ITAT",
         "GST",
@@ -173,6 +324,7 @@ const router = useRouter();
         try {
           const res = await fetch(url);
           const json = await res.json();
+          console.log(`fetched data for ${cat}: ${json.data} pages`);
 
           if (json.success) {
             counts[cat] = json.data;
@@ -185,6 +337,8 @@ const router = useRouter();
           counts[cat] = 0;
         }
       }
+       // Cache the results
+      setCachedCategoryCounts(selectedYear, counts, total);
 
       setCategoryCounts(counts);
       setOverallTotal(total);
@@ -192,11 +346,22 @@ const router = useRouter();
     };
 
     fetchAllCategoryCounts();
-  }, [selectedYear]);
+  }, []);
 
   useEffect(() => {
     const loadData = async () => {
       try {
+        // Check cache first
+        const cachedData = getCachedData(
+          currentPage,
+          selectedCategory,
+          selectedYear
+        );
+        if (cachedData) {
+          setCases(cachedData);
+          setFilteredCases(cachedData);
+          return;
+        }
         setLoading(true);
         const formInput = encodeURIComponent(
           getFormInputByCategory(selectedCategory)
@@ -215,6 +380,7 @@ const router = useRouter();
         const res = await fetch(apiUrl);
 
         const json = await res.json();
+        console.log("Fetched data from API", json);
 
         if (!json.success || !Array.isArray(json.data)) {
           console.error("Invalid API response format", json);
@@ -245,6 +411,9 @@ const router = useRouter();
           };
         });
 
+        // Cache the data
+        setCachedData(currentPage, selectedCategory, selectedYear, mappedCases);
+
         setCases(mappedCases);
         setTotalPages(10);
       } catch (error) {
@@ -257,6 +426,52 @@ const router = useRouter();
     loadData();
   }, [currentPage, selectedCategory, selectedYear]);
 
+  // Clear cache when category or year changes
+  useEffect(() => {
+    setCurrentPage(1); // Reset to first page when filters change
+  }, [selectedCategory, selectedYear]);
+  // Add cache management functions for potential future use
+  // const getCacheStats = () => {
+  //   const cacheSize = cacheRef.current.size;
+  //   const validEntries = Array.from(cacheRef.current.values()).filter((entry) =>
+  //     isCacheValid(entry)
+  //   ).length;
+
+  //   return {
+  //     totalEntries: cacheSize,
+  //     validEntries: validEntries,
+  //     expiredEntries: cacheSize - validEntries,
+  //   };
+  // };
+
+  // const clearExpiredCache = () => {
+  //   const keysToDelete: string[] = [];
+
+  //   cacheRef.current.forEach((entry, key) => {
+  //     if (!isCacheValid(entry)) {
+  //       keysToDelete.push(key);
+  //     }
+  //   });
+
+  //   keysToDelete.forEach((key) => {
+  //     cacheRef.current.delete(key);
+  //   });
+
+  //   console.log(`Cleared ${keysToDelete.length} expired cache entries`);
+  // };
+
+  // Navigation with cache awareness
+  // const handlePageChange = (newPage: number) => {
+  //   setCurrentPage(newPage);
+  // };
+
+  const handlePreviousPage = () => {
+    setCurrentPage((prev) => Math.max(prev - 1, 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage((prev) => prev + 1);
+  };
   useEffect(() => {
     filterCases();
   }, [
@@ -431,6 +646,29 @@ const router = useRouter();
       color: "text-orange-600",
     },
   ];
+   useEffect(() => {
+    const cleanupInterval = setInterval(() => {
+      const now = Date.now();
+      
+      // Clean up data cache
+      for (const [key, entry] of cacheRef.current.entries()) {
+        if (now - entry.timestamp >= CACHE_DURATION) {
+          cacheRef.current.delete(key);
+          console.log(`Expired cache entry removed: ${key}`);
+        }
+      }
+      
+      // Clean up category count cache
+      for (const [key, entry] of categoryCountCacheRef.current.entries()) {
+        if (now - entry.timestamp >= CACHE_DURATION) {
+          categoryCountCacheRef.current.delete(key);
+          console.log(`Expired category count cache entry removed: ${key}`);
+        }
+      }
+    }, CACHE_DURATION); // Clean up every 5 minutes
+
+    return () => clearInterval(cleanupInterval);
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -823,20 +1061,21 @@ const router = useRouter();
                                 {/* Actions */}
                                 <td className="border border-gray-300 px-4 py-3 align-top">
                                   <div className="flex flex-col gap-1">
-                                  
                                     <Button
                                       size="sm"
                                       variant="outline"
                                       className="h-8 px-2"
-                                     onClick={(e) => {
-    e.stopPropagation(); // prevent row toggle
-    router.push(`/case-laws/${caseItem.caseNumber}`); // navigate to dynamic route
-  }}
+                                      onClick={(e) => {
+                                        e.stopPropagation(); // prevent row toggle
+                                        router.push(
+                                          `/case-laws/${caseItem.caseNumber}`
+                                        ); // navigate to dynamic route
+                                      }}
                                     >
                                       <Eye className="h-4 w-4 mr-1" />
                                       View
                                     </Button>
-                                   
+
                                     {isExpanded && (
                                       <>
                                         {caseItem.pdfUrl && (
@@ -879,152 +1118,177 @@ const router = useRouter();
             </div>
           </TabsContent>
 
-   <TabsContent value="browse" className="space-y-6">
-  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-    {statsLoading
-      ? Array.from({ length: 5 }).map((_, idx) => (
-          <Card key={`skeleton-${idx}`} className="p-6 space-y-4 animate-pulse">
-            <div className="h-5 w-1/2 bg-gray-300 rounded" />
-            <div className="h-8 w-1/3 bg-gray-300 rounded" />
-            <div className="h-10 w-full bg-gray-200 rounded mt-2" />
-          </Card>
-        ))
-      : ["ITAT", "GST", "INCOME_TAX", "HIGH_COURT", "SUPREME_COURT"].map((category) => (
-          <Card key={category} className="hover:shadow-lg transition-shadow cursor-pointer">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Gavel className="h-5 w-5" />
-                {category.replace("_", " ")}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <p className="text-2xl font-bold">
-                  {categoryCounts[category] ?? 0}
-                </p>
-                <p className="text-sm text-gray-600">Available cases</p>
+          <TabsContent value="browse" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {statsLoading
+                ? Array.from({ length: 5 }).map((_, idx) => (
+                    <Card
+                      key={`skeleton-${idx}`}
+                      className="p-6 space-y-4 animate-pulse"
+                    >
+                      <div className="h-5 w-1/2 bg-gray-300 rounded" />
+                      <div className="h-8 w-1/3 bg-gray-300 rounded" />
+                      <div className="h-10 w-full bg-gray-200 rounded mt-2" />
+                    </Card>
+                  ))
+                : [
+                    "ITAT",
+                    "GST",
+                    "INCOME_TAX",
+                    "HIGH_COURT",
+                    "SUPREME_COURT",
+                  ].map((category) => (
+                    <Card
+                      key={category}
+                      className="hover:shadow-lg transition-shadow cursor-pointer"
+                    >
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Gavel className="h-5 w-5" />
+                          {category.replace("_", " ")}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          <p className="text-2xl font-bold">
+                            {categoryCounts[category] ?? 0}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            Available cases
+                          </p>
 
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => {
-                    setSelectedCategory(category);
-                    // Switch to search tab if needed
-                  }}
-                >
-                  Browse Cases
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-  </div>
-</TabsContent>
-
+                          <Button
+                            variant="outline"
+                            className="w-full"
+                            onClick={() => {
+                              setSelectedCategory(category);
+                              // Switch to search tab if needed
+                            }}
+                          >
+                            Browse Cases
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+            </div>
+          </TabsContent>
 
           <TabsContent value="analytics" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
-  <CardHeader>
-    <CardTitle>Case Distribution by Category</CardTitle>
-  </CardHeader>
-  <CardContent>
-    {statsLoading ? (
-      <div className="space-y-4">
-        {Array.from({ length: 5 }).map((_, idx) => (
-          <div key={idx} className="space-y-2">
-            <div className="flex justify-between">
-              <div className="w-24 h-4 bg-gray-200 rounded" />
-              <div className="w-16 h-4 bg-gray-200 rounded" />
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2" />
-          </div>
-        ))}
-      </div>
-    ) : (
-      <div className="space-y-4">
-        {["ITAT", "GST", "INCOME_TAX", "HIGH_COURT", "SUPREME_COURT"].map((category) => {
-          const count = categoryCounts[category] ?? 0;
-          const percentage = totalcasescount > 0 ? (count / totalcasescount) * 100 : 0;
+              <Card>
+                <CardHeader>
+                  <CardTitle>Case Distribution by Category</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {statsLoading ? (
+                    <div className="space-y-4">
+                      {Array.from({ length: 5 }).map((_, idx) => (
+                        <div key={idx} className="space-y-2">
+                          <div className="flex justify-between">
+                            <div className="w-24 h-4 bg-gray-200 rounded" />
+                            <div className="w-16 h-4 bg-gray-200 rounded" />
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {[
+                        "ITAT",
+                        "GST",
+                        "INCOME_TAX",
+                        "HIGH_COURT",
+                        "SUPREME_COURT",
+                      ].map((category) => {
+                        const count = categoryCounts[category] ?? 0;
+                        const percentage =
+                          totalcasescount > 0
+                            ? (count / totalcasescount) * 100
+                            : 0;
 
-          return (
-            <div key={category} className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm font-medium">
-                  {category.replace("_", " ")}
-                </span>
-                <span className="text-sm text-gray-600">
-                  {count.toLocaleString()} ({percentage.toFixed(1)}%)
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-blue-600 h-2 rounded-full"
-                  style={{ width: `${percentage}%` }}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    )}
-  </CardContent>
-</Card>
+                        return (
+                          <div key={category} className="space-y-2">
+                            <div className="flex justify-between">
+                              <span className="text-sm font-medium">
+                                {category.replace("_", " ")}
+                              </span>
+                              <span className="text-sm text-gray-600">
+                                {count.toLocaleString()} (
+                                {percentage.toFixed(1)}%)
+                              </span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div
+                                className="bg-blue-600 h-2 rounded-full"
+                                style={{ width: `${percentage}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
 
+              <Card>
+                <CardHeader>
+                  <CardTitle>Outcome Analysis</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {statsLoading ? (
+                    <div className="space-y-4">
+                      {Array.from({ length: 3 }).map((_, idx) => (
+                        <div key={idx} className="space-y-2">
+                          <div className="flex justify-between">
+                            <div className="w-24 h-4 bg-gray-200 rounded" />
+                            <div className="w-16 h-4 bg-gray-200 rounded" />
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {["allowed", "dismissed", "partly_allowed"].map(
+                        (outcome) => {
+                          const count = cases.filter(
+                            (c) => c.outcome === outcome
+                          ).length;
+                          const percentage = (count / cases.length) * 100;
 
-            <Card>
-  <CardHeader>
-    <CardTitle>Outcome Analysis</CardTitle>
-  </CardHeader>
-  <CardContent>
-    {statsLoading ? (
-      <div className="space-y-4">
-        {Array.from({ length: 3 }).map((_, idx) => (
-          <div key={idx} className="space-y-2">
-            <div className="flex justify-between">
-              <div className="w-24 h-4 bg-gray-200 rounded" />
-              <div className="w-16 h-4 bg-gray-200 rounded" />
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2" />
-          </div>
-        ))}
-      </div>
-    ) : (
-      <div className="space-y-4">
-        {["allowed", "dismissed", "partly_allowed"].map((outcome) => {
-          const count = cases.filter((c) => c.outcome === outcome).length;
-          const percentage = (count / cases.length) * 100;
-
-          return (
-            <div key={outcome} className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm font-medium">
-                  {outcome.replace("_", " ").toUpperCase()}
-                </span>
-                <span className="text-sm text-gray-600">
-                  {count} ({percentage.toFixed(1)}%)
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className={`h-2 rounded-full ${
-                    outcome === "allowed"
-                      ? "bg-green-600"
-                      : outcome === "dismissed"
-                      ? "bg-red-600"
-                      : "bg-yellow-600"
-                  }`}
-                  style={{ width: `${percentage}%` }}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    )}
-  </CardContent>
-</Card>
-
+                          return (
+                            <div key={outcome} className="space-y-2">
+                              <div className="flex justify-between">
+                                <span className="text-sm font-medium">
+                                  {outcome.replace("_", " ").toUpperCase()}
+                                </span>
+                                <span className="text-sm text-gray-600">
+                                  {count} ({percentage.toFixed(1)}%)
+                                </span>
+                              </div>
+                              <div className="w-full bg-gray-200 rounded-full h-2">
+                                <div
+                                  className={`h-2 rounded-full ${
+                                    outcome === "allowed"
+                                      ? "bg-green-600"
+                                      : outcome === "dismissed"
+                                      ? "bg-red-600"
+                                      : "bg-yellow-600"
+                                  }`}
+                                  style={{ width: `${percentage}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        }
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           </TabsContent>
         </Tabs>
@@ -1037,7 +1301,7 @@ const router = useRouter();
 
         <nav className="inline-flex space-x-2">
           <button
-            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+            onClick={handlePreviousPage}
             className="px-3 py-1 border rounded disabled:opacity-50"
             disabled={currentPage === 1}
           >
@@ -1049,7 +1313,7 @@ const router = useRouter();
           </span>
 
           <button
-            onClick={() => setCurrentPage((prev) => prev + 1)}
+            onClick={handleNextPage}
             className="px-3 py-1 border rounded disabled:opacity-50"
             disabled={lastPageReached}
           >
