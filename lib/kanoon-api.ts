@@ -3,9 +3,9 @@ import axios from "axios";
 
 
 
-const INDIAN_KANOON_TOKEN = "94eafebe791061b36a2071fc993acd0f05acb2f3";
+const INDIAN_KANOON_TOKEN = process.env.NEXT_PUBLIC_KANOON_TOKEN;
 
-const INDIAN_KANOON_ENDPOINT = "https://api.indiankanoon.org";
+const INDIAN_KANOON_ENDPOINT = process.env.NEXT_PUBLIC_KANOON_URL || "https://api.indiankanoon.org";
 
 export interface IKanoonResult {
   tid: number;

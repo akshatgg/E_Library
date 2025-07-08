@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-
+import { ArrowLeft, Loader, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 interface CaseData {
   success: boolean;
   data: {
@@ -25,6 +26,7 @@ export default function CasePage({ params }: { params: { tid: string } }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
+const router = useRouter();
 
   const tid = parseInt(params.tid, 10);
 
@@ -127,12 +129,10 @@ export default function CasePage({ params }: { params: { tid: string } }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading case data...</p>
-        </div>
-      </div>
+    <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processing...
+                  </>
     );
   }
 
@@ -153,6 +153,18 @@ export default function CasePage({ params }: { params: { tid: string } }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
+
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+  <button
+    onClick={() => router.back()}
+    className="inline-flex items-center text-sm font-medium text-blue-600 hover:underline"
+  >
+    <ArrowLeft className="w-4 h-4 mr-2" />
+    Back to Previous
+  </button>
+</div>
+
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
