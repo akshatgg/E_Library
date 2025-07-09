@@ -1,37 +1,57 @@
-"use client"
+"use client";
 
-import React, { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { useForm } from "react-hook-form"
-import { z } from "zod"
-import { zodResolver } from "@hookform/resolvers/zod"
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { BookOpen, Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react"
-import { useAuthContext } from "@/components/auth-provider"
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BookOpen, Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
+import { useAuthContext } from "@/components/auth-provider";
+import { X } from "lucide-react"
 
 // Zod Schemas
 const SignInSchema = z.object({
   email: z.string().email("Invalid email"),
   password: z.string().min(6, "Password must be at least 6 characters"),
-})
+});
 
 const SignUpSchema = SignInSchema.extend({
   displayName: z.string().min(2, "Name must be at least 2 characters"),
-})
+});
 
-type SignInForm = z.infer<typeof SignInSchema>
-type SignUpForm = z.infer<typeof SignUpSchema>
+type SignInForm = z.infer<typeof SignInSchema>;
+type SignUpForm = z.infer<typeof SignUpSchema>;
 
 export default function SignInPage() {
-  const [activeTab, setActiveTab] = useState("signin")
-  const [error, setError] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
+  const [activeTab, setActiveTab] = useState("signin");
+  const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetSent, setResetSent] = useState(false);
+
+  const handleResetPassword = async () => {
+    setError("");
+    try {
+      await resetPassword(resetEmail);
+      setResetSent(true);
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
 
   const {
     register: signInRegister,
@@ -39,7 +59,7 @@ export default function SignInPage() {
     formState: { errors: signInErrors, isSubmitting: isSigningIn },
   } = useForm<SignInForm>({
     resolver: zodResolver(SignInSchema),
-  })
+  });
 
   const {
     register: signUpRegister,
@@ -47,36 +67,36 @@ export default function SignInPage() {
     formState: { errors: signUpErrors, isSubmitting: isSigningUp },
   } = useForm<SignUpForm>({
     resolver: zodResolver(SignUpSchema),
-  })
+  });
 
-  const { signIn, signUp, isAuthenticated } = useAuthContext()
-  const router = useRouter()
+  const { signIn, signUp, isAuthenticated, resetPassword } = useAuthContext();
+  const router = useRouter();
 
   useEffect(() => {
     if (isAuthenticated) {
-      router.push("/")
+      router.push("/");
     }
-  }, [isAuthenticated, router])
+  }, [isAuthenticated, router]);
 
   const handleEmailSignIn = async (data: SignInForm) => {
-    setError("")
+    setError("");
     try {
-      await signIn(data.email, data.password)
-      router.push("/")
+      await signIn(data.email, data.password);
+      router.push("/");
     } catch (err: any) {
-      setError(err.message)
+      setError(err.message);
     }
-  }
+  };
 
   const handleEmailSignUp = async (data: SignUpForm) => {
-    setError("")
+    setError("");
     try {
-      await signUp(data.email, data.password, data.displayName)
-      router.push("/")
+      await signUp(data.email, data.password, data.displayName);
+      router.push("/");
     } catch (err: any) {
-      setError(err.message)
+      setError(err.message);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4">
@@ -91,18 +111,26 @@ export default function SignInPage() {
               <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                 E-Library
               </h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">by iTax Easy</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                by iTax Easy
+              </p>
             </div>
           </div>
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Welcome</h2>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">Access your legal research platform</p>
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
+            Welcome
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 mt-2">
+            Access your legal research platform
+          </p>
         </div>
 
         {/* Auth Card */}
         <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg border-white/20 dark:border-gray-700/20 shadow-xl">
           <CardHeader>
             <CardTitle className="text-center">Sign In to Continue</CardTitle>
-            <CardDescription className="text-center">Access your account</CardDescription>
+            <CardDescription className="text-center">
+              Access your account
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -113,7 +141,10 @@ export default function SignInPage() {
 
               {/* Sign In */}
               <TabsContent value="signin">
-                <form onSubmit={handleSignInSubmit(handleEmailSignIn)} className="space-y-4">
+                <form
+                  onSubmit={handleSignInSubmit(handleEmailSignIn)}
+                  className="space-y-4"
+                >
                   <div className="space-y-2">
                     <Label htmlFor="signin-email">Email</Label>
                     <div className="relative">
@@ -126,7 +157,11 @@ export default function SignInPage() {
                         {...signInRegister("email")}
                       />
                     </div>
-                    {signInErrors.email && <p className="text-red-500 text-sm">{signInErrors.email.message}</p>}
+                    {signInErrors.email && (
+                      <p className="text-red-500 text-sm">
+                        {signInErrors.email.message}
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -147,13 +182,39 @@ export default function SignInPage() {
                         className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                         onClick={() => setShowPassword(!showPassword)}
                       >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
                       </Button>
                     </div>
-                    {signInErrors.password && <p className="text-red-500 text-sm">{signInErrors.password.message}</p>}
+                    {signInErrors.password && (
+                      <p className="text-red-500 text-sm">
+                        {signInErrors.password.message}
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-right text-sm">
+                    <button
+                      type="button"
+                      className="text-blue-600 hover:underline"
+                      onClick={() => {
+                        setShowForgot(true);
+                        setResetSent(false);
+                        setResetEmail("");
+                        setError("");
+                      }}
+                    >
+                      Forgot Password?
+                    </button>
                   </div>
 
-                  <Button type="submit" className="w-full" disabled={isSigningIn}>
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={isSigningIn}
+                  >
                     {isSigningIn ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -168,7 +229,10 @@ export default function SignInPage() {
 
               {/* Sign Up */}
               <TabsContent value="signup">
-                <form onSubmit={handleSignUpSubmit(handleEmailSignUp)} className="space-y-4">
+                <form
+                  onSubmit={handleSignUpSubmit(handleEmailSignUp)}
+                  className="space-y-4"
+                >
                   <div className="space-y-2">
                     <Label htmlFor="signup-name">Full Name</Label>
                     <Input
@@ -178,7 +242,9 @@ export default function SignInPage() {
                       {...signUpRegister("displayName")}
                     />
                     {signUpErrors.displayName && (
-                      <p className="text-red-500 text-sm">{signUpErrors.displayName.message}</p>
+                      <p className="text-red-500 text-sm">
+                        {signUpErrors.displayName.message}
+                      </p>
                     )}
                   </div>
 
@@ -194,7 +260,11 @@ export default function SignInPage() {
                         {...signUpRegister("email")}
                       />
                     </div>
-                    {signUpErrors.email && <p className="text-red-500 text-sm">{signUpErrors.email.message}</p>}
+                    {signUpErrors.email && (
+                      <p className="text-red-500 text-sm">
+                        {signUpErrors.email.message}
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -215,13 +285,25 @@ export default function SignInPage() {
                         className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                         onClick={() => setShowPassword(!showPassword)}
                       >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
                       </Button>
                     </div>
-                    {signUpErrors.password && <p className="text-red-500 text-sm">{signUpErrors.password.message}</p>}
+                    {signUpErrors.password && (
+                      <p className="text-red-500 text-sm">
+                        {signUpErrors.password.message}
+                      </p>
+                    )}
                   </div>
 
-                  <Button type="submit" className="w-full" disabled={isSigningUp}>
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={isSigningUp}
+                  >
                     {isSigningUp ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -242,11 +324,73 @@ export default function SignInPage() {
             )}
           </CardContent>
         </Card>
+        {/* Forgot Password Modal */}
+        {showForgot && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="relative bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-sm">
+              <button
+                onClick={() => setShowForgot(false)}
+                className="absolute top-2 right-2 text-gray-500 hover:text-gray-800 dark:hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+
+              <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">
+                Reset Your Password
+              </h3>
+
+              {resetSent ? (
+                <div>
+                  <p className="text-green-600 mb-4">
+                    A reset link has been sent to your email.
+                  </p>
+                  <Button
+                    onClick={() => setShowForgot(false)}
+                    className="w-full"
+                  >
+                    Close
+                  </Button>
+                </div>
+              ) : (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleResetPassword();
+                  }}
+                >
+                  <Label htmlFor="reset-email">Email</Label>
+                  <Input
+                    id="reset-email"
+                    type="email"
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    placeholder="Enter your email"
+                    className="mt-2 mb-4"
+                    autoFocus
+                  />
+                  <div className="flex justify-end space-x-2">
+                    <Button
+                      variant="ghost"
+                      onClick={() => setShowForgot(false)}
+                      type="button"
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit">Send Link</Button>
+                  </div>
+                  {error && (
+                    <p className="text-red-500 text-sm mt-2">{error}</p>
+                  )}
+                </form>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="text-center mt-8 text-sm text-gray-500 dark:text-gray-400">
           <p>© 2024 iTax Easy Private Limited. All rights reserved.</p>
         </div>
       </div>
     </div>
-  )
+  );
 }
