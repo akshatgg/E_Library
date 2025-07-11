@@ -30,13 +30,8 @@ import { set } from "date-fns";
 
 export default function HomePage() {
   const { user, isAuthenticated, isLoading, signOut } = useAuth()
-  const { theme, setTheme } = useTheme()
-  type UserData = {
-    displayName?: string;
-    // Add other properties if needed
-    [key: string]: any;
-  };
-  const [userData, setUserData] = useState<UserData | null>(null);
+
+
   const router = useRouter()
 
   useEffect(() => {
@@ -46,17 +41,7 @@ export default function HomePage() {
   }, [isAuthenticated, isLoading, router])
   
 
-useEffect(() => {
-  const loadUserData = async () => {
-    if (auth.currentUser) {
-      const userData = await getUserDataFromFirestore(auth.currentUser.uid);
-      console.log("User Data:", userData);
-      setUserData(userData);
-    }
-  };
 
-  loadUserData();
-}, []);
 
   if (isLoading) {
     return (

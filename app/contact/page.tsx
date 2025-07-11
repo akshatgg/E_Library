@@ -124,7 +124,7 @@ export default function ContactPage() {
       icon: <HeadphonesIcon className="w-6 h-6 text-orange-600" />,
       title: "Technical Support",
       description: "Technical assistance",
-      contact: "tech@itaxeasy.com",
+      contact: "info@itaxeasy.com",
       availability: "24/7 Available",
       action: "Get Help",
     },
@@ -136,21 +136,21 @@ export default function ContactPage() {
       address: "123 Legal District, Connaught Place",
       postal: "New Delhi, India 110001",
       phone: "+91 98765 43210",
-      email: "delhi@itaxeasy.com",
+      email: "info@itaxeasy.com",
     },
     {
       city: "Mumbai",
       address: "456 Business Hub, Bandra Kurla Complex",
       postal: "Mumbai, India 400051",
       phone: "+91 87654 32109",
-      email: "mumbai@itaxeasy.com",
+      email: "info@itaxeasy.com",
     },
     {
       city: "Bangalore",
       address: "789 Tech Park, Electronic City",
       postal: "Bangalore, India 560100",
       phone: "+91 76543 21098",
-      email: "bangalore@itaxeasy.com",
+      email: "info@itaxeasy.com",
     },
   ]
 

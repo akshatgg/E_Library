@@ -77,7 +77,7 @@ export function DashboardFooter() {
 
         <div className="border-t border-gray-200 dark:border-gray-700 mt-6 pt-4 text-center">
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            © 2024 iTax Easy Private Limited. All rights reserved. | Powered by Next.js & AI
+            © 2024 iTax Easy Private Limited. All rights reserved. | Powered by Itaxeasy
           </p>
         </div>
       </div>
