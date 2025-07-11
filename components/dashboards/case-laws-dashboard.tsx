@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import CaseTablePDF from "../pdf/CaseTablePDF";
+import { pdf } from "@react-pdf/renderer";
 
 import {
   Select,
@@ -36,7 +38,7 @@ import { toast } from "sonner";
 
 import { useRouter } from "next/navigation";
 
-interface CaseData {
+export interface CaseData {
   id: string;
   title: string;
   court: string;
@@ -337,7 +339,7 @@ export function CaseLawsDashboard() {
           counts[cat] = 0;
         }
       }
-       // Cache the results
+      // Cache the results
       setCachedCategoryCounts(selectedYear, counts, total);
 
       setCategoryCounts(counts);
@@ -646,10 +648,10 @@ export function CaseLawsDashboard() {
       color: "text-orange-600",
     },
   ];
-   useEffect(() => {
+  useEffect(() => {
     const cleanupInterval = setInterval(() => {
       const now = Date.now();
-      
+
       // Clean up data cache
       for (const [key, entry] of cacheRef.current.entries()) {
         if (now - entry.timestamp >= CACHE_DURATION) {
@@ -657,7 +659,7 @@ export function CaseLawsDashboard() {
           console.log(`Expired cache entry removed: ${key}`);
         }
       }
-      
+
       // Clean up category count cache
       for (const [key, entry] of categoryCountCacheRef.current.entries()) {
         if (now - entry.timestamp >= CACHE_DURATION) {
@@ -669,6 +671,17 @@ export function CaseLawsDashboard() {
 
     return () => clearInterval(cleanupInterval);
   }, []);
+
+  const handleDownloadPDF = async () => {
+    const blob = await pdf(<CaseTablePDF cases={filteredCases} />).toBlob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "case_table.pdf";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -845,6 +858,9 @@ export function CaseLawsDashboard() {
                     >
                       <Filter className="h-4 w-4 mr-2" />
                       Clear
+                    </Button>
+                    <Button onClick={handleDownloadPDF} className="mb-4">
+                      <Download className="h-4 w-4 mr-2" /> Download PDF
                     </Button>
                   </div>
                 </div>
