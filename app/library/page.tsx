@@ -1,5 +1,5 @@
-import { LibraryDashboard } from "@/components/dashboards/library-dashboard"
+// import { LibraryDashboard } from "@/components/dashboards/library-dashboard"
 
 export default function LibraryPage() {
-  return <LibraryDashboard />
+  return 0;
 }

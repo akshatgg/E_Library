@@ -158,7 +158,9 @@ function DashboardContent() {
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-      <DashboardHeader />
+      <DashboardHeader onAddEntry={function (): void {
+        throw new Error("Function not implemented.")
+      } } />
 
       <div className="flex-1 flex">
         <DashboardSidebar />
