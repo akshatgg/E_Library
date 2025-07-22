@@ -37,6 +37,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   addCredits: (amount: number) => Promise<User>;
   useCredits: (amount: number) => Promise<User>;
+  refreshUserData: () => Promise<void>;
   isAuthenticated: boolean;
   resetPassword: (email: string) => Promise<void>;
 }
@@ -143,30 +144,81 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             await setTokenWithExpiry(firebaseUser);
           }
 
-          const userRef = doc(db, "users", firebaseUser.uid);
-          const docSnap = await getDoc(userRef);
+          // Try Firebase first, then simple storage fallback
+          let userData: User | null = null;
+          
+          try {
+            const userRef = doc(db, "users", firebaseUser.uid);
+            const docSnap = await getDoc(userRef);
 
-          if (docSnap.exists()) {
-            const userData = docSnap.data() as User;
-            // Update last login
-            const updatedUserData = {
-              ...userData,
-              lastLogin: new Date(),
-            };
-            await setDoc(userRef, updatedUserData);
-            setUser(updatedUserData);
-          } else {
-            const newUser: User = {
-              uid: firebaseUser.uid,
-              email: firebaseUser.email || "",
-              displayName: firebaseUser.displayName || "",
-              credits: 0,
-              role: "user",
-              createdAt: new Date(),
-              lastLogin: new Date(),
-            };
-            await setDoc(userRef, newUser);
-            setUser(newUser);
+            if (docSnap.exists()) {
+              userData = docSnap.data() as User;
+              // Update last login
+              const updatedUserData = {
+                ...userData,
+                lastLogin: new Date(),
+              };
+              await setDoc(userRef, updatedUserData);
+              setUser(updatedUserData);
+            } else {
+              // User doesn't exist in Firebase, create new user
+              const newUser: User = {
+                uid: firebaseUser.uid,
+                email: firebaseUser.email || "",
+                displayName: firebaseUser.displayName || "",
+                credits: 0,
+                role: "user",
+                createdAt: new Date(),
+                lastLogin: new Date(),
+              };
+              await setDoc(userRef, newUser);
+              setUser(newUser);
+            }
+          } catch (firebaseError) {
+            console.log("Firebase user fetch failed, trying simple storage:", firebaseError);
+            
+            // Fallback to simple storage API
+            try {
+              const response = await fetch(`/api/user/transactions?userId=${firebaseUser.uid}`);
+              if (response.ok) {
+                const data = await response.json();
+                userData = {
+                  uid: firebaseUser.uid,
+                  email: firebaseUser.email || "",
+                  displayName: firebaseUser.displayName || "",
+                  credits: data.credits || 0,
+                  role: "user" as const,
+                  createdAt: new Date(),
+                  lastLogin: new Date(),
+                };
+                setUser(userData);
+              } else {
+                // Create new user if simple storage also fails
+                const newUser: User = {
+                  uid: firebaseUser.uid,
+                  email: firebaseUser.email || "",
+                  displayName: firebaseUser.displayName || "",
+                  credits: 0,
+                  role: "user",
+                  createdAt: new Date(),
+                  lastLogin: new Date(),
+                };
+                setUser(newUser);
+              }
+            } catch (apiError) {
+              console.log("Simple storage user fetch failed:", apiError);
+              // Create new user as last resort
+              const newUser: User = {
+                uid: firebaseUser.uid,
+                email: firebaseUser.email || "",
+                displayName: firebaseUser.displayName || "",
+                credits: 0,
+                role: "user",
+                createdAt: new Date(),
+                lastLogin: new Date(),
+              };
+              setUser(newUser);
+            }
           }
         } else {
           await handleSignOut();
@@ -280,6 +332,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const refreshUserData = async () => {
+    if (!user) {
+      console.log("No user to refresh");
+      return;
+    }
+    
+    console.log("Refreshing user data for:", user.uid);
+    
+    // Try to fetch updated credit data from both sources
+    try {
+      // Try Firebase first
+      const userRef = doc(db, "users", user.uid);
+      const docSnap = await getDoc(userRef);
+
+      if (docSnap.exists()) {
+        const userData = docSnap.data() as User;
+        console.log("Firebase refresh - old credits:", user.credits, "new credits:", userData.credits);
+        setUser({ ...user, credits: userData.credits });
+        return;
+      }
+    } catch (firebaseError) {
+      console.log("Firebase refresh failed, trying simple storage:", firebaseError);
+    }
+
+    // Fallback to simple storage API
+    try {
+      console.log("Trying simple storage refresh...");
+      const response = await fetch(`/api/user/transactions?userId=${user.uid}`);
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Simple storage refresh - old credits:", user.credits, "new credits:", data.credits);
+        setUser({ ...user, credits: data.credits || 0 });
+      } else {
+        console.log("Simple storage API response not ok:", response.status);
+      }
+    } catch (apiError) {
+      console.log("Simple storage refresh failed:", apiError);
+    }
+  };
+
   const addCredits = async (amount: number) => {
     if (!user) throw new Error("Not authenticated");
     
@@ -288,13 +380,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Authentication expired");
     }
     
+    console.log(`Adding ${amount} credits to user ${user.uid} - current: ${user.credits || 0}`);
+    
     const updated = {
       ...user,
       credits: (user.credits || 0) + amount,
     };
-    await setDoc(doc(db, "users", user.uid), updated);
-    setUser(updated);
-    return updated;
+    
+    // Try Firebase first
+    try {
+      await setDoc(doc(db, "users", user.uid), updated);
+      console.log("Credits added successfully via Firebase");
+      setUser(updated);
+      return updated;
+    } catch (firebaseError) {
+      console.log("Firebase addCredits failed, trying simple storage API:", firebaseError);
+      
+      // Fallback to simple storage API
+      try {
+        const response = await fetch("/api/user/add-credits", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            userId: user.uid,
+            credits: amount,
+          }),
+        });
+        
+        if (response.ok) {
+          console.log("Credits added successfully via simple storage API");
+          setUser(updated);
+          return updated;
+        } else {
+          throw new Error("Simple storage API failed");
+        }
+      } catch (apiError) {
+        console.error("Both Firebase and simple storage addCredits failed:", apiError);
+        throw new Error("Failed to add credits");
+      }
+    }
   };
 
   const useCredits = async (amount: number) => {
@@ -335,6 +461,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signOut,
     addCredits,
     useCredits,
+    refreshUserData,
     isAuthenticated: !!user && !isTokenExpired(),
     resetPassword,
   };

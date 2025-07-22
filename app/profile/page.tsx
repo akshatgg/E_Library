@@ -5,19 +5,44 @@ import { CreditDisplay } from "@/components/credit-system/credit-display"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Badge } from "@/components/ui/badge"
 import { useRouter } from "next/navigation"
 import { useEffect } from "react"
-import { User, CreditCard, History, Settings } from "lucide-react"
+import { User, CreditCard, History, Settings, IndianRupee, Clock, CheckCircle, XCircle, Loader2 } from "lucide-react"
+import { useRazorpay } from "@/hooks/use-razorpay"
+import { useTransactionHistory } from "@/hooks/use-transaction-history"
+import { useToast } from "@/hooks/use-toast"
 
 export default function ProfilePage() {
-  const { user, isAuthenticated, signOut } = useAuthContext()
+  const { user, isAuthenticated, signOut, refreshUserData } = useAuthContext()
   const router = useRouter()
+  const { makePayment, isLoading: isPaymentLoading } = useRazorpay()
+  const { transactions, loading: transactionsLoading, refetch } = useTransactionHistory()
+  const { toast } = useToast()
 
   useEffect(() => {
     if (!isAuthenticated) {
       router.push("/auth/signin")
     }
   }, [isAuthenticated, router])
+
+  const handleCreditPurchase = async (credits: number, amount: number) => {
+    try {
+      await makePayment({ credits, amount })
+      // Refetch transactions and refresh user data after successful payment
+      await Promise.all([
+        refetch(),
+        refreshUserData()
+      ])
+    } catch (error) {
+      console.error("Payment error:", error)
+      toast({
+        title: "Payment Error",
+        description: "Failed to process payment. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
 
   if (!user) {
     return (
@@ -90,8 +115,7 @@ export default function ProfilePage() {
                       </div>
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Last Login</p>
-<p>{user.lastLogin.toDate().toLocaleString()}</p>
-
+                        <p>{user.lastLogin ? new Date(user.lastLogin).toLocaleString() : 'N/A'}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -129,21 +153,60 @@ export default function ProfilePage() {
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <Button variant="outline" className="h-auto py-4 flex flex-col">
-                          <span className="text-2xl font-bold">50</span>
-                          <span className="text-sm text-muted-foreground">credits</span>
-                          <span className="mt-2 font-medium">₹499</span>
+                        <Button 
+                          variant="outline" 
+                          className="h-auto py-4 flex flex-col hover:border-blue-500 transition-colors"
+                          onClick={() => handleCreditPurchase(50, 499)}
+                          disabled={isPaymentLoading}
+                        >
+                          {isPaymentLoading ? (
+                            <Loader2 className="h-6 w-6 animate-spin" />
+                          ) : (
+                            <>
+                              <span className="text-2xl font-bold">50</span>
+                              <span className="text-sm text-muted-foreground">credits</span>
+                              <span className="mt-2 font-medium flex items-center">
+                                <IndianRupee className="h-4 w-4" />499
+                              </span>
+                            </>
+                          )}
                         </Button>
-                        <Button variant="outline" className="h-auto py-4 flex flex-col border-2 border-blue-500">
-                          <span className="text-2xl font-bold">100</span>
-                          <span className="text-sm text-muted-foreground">credits</span>
-                          <span className="mt-2 font-medium">₹899</span>
-                          <span className="text-xs text-blue-500 mt-1">Best Value</span>
+                        <Button 
+                          variant="outline" 
+                          className="h-auto py-4 flex flex-col border-2 border-blue-500 hover:border-blue-600 transition-colors"
+                          onClick={() => handleCreditPurchase(100, 899)}
+                          disabled={isPaymentLoading}
+                        >
+                          {isPaymentLoading ? (
+                            <Loader2 className="h-6 w-6 animate-spin" />
+                          ) : (
+                            <>
+                              <span className="text-2xl font-bold">100</span>
+                              <span className="text-sm text-muted-foreground">credits</span>
+                              <span className="mt-2 font-medium flex items-center">
+                                <IndianRupee className="h-4 w-4" />899
+                              </span>
+                              <span className="text-xs text-blue-500 mt-1">Best Value</span>
+                            </>
+                          )}
                         </Button>
-                        <Button variant="outline" className="h-auto py-4 flex flex-col">
-                          <span className="text-2xl font-bold">200</span>
-                          <span className="text-sm text-muted-foreground">credits</span>
-                          <span className="mt-2 font-medium">₹1699</span>
+                        <Button 
+                          variant="outline" 
+                          className="h-auto py-4 flex flex-col hover:border-blue-500 transition-colors"
+                          onClick={() => handleCreditPurchase(200, 1699)}
+                          disabled={isPaymentLoading}
+                        >
+                          {isPaymentLoading ? (
+                            <Loader2 className="h-6 w-6 animate-spin" />
+                          ) : (
+                            <>
+                              <span className="text-2xl font-bold">200</span>
+                              <span className="text-sm text-muted-foreground">credits</span>
+                              <span className="mt-2 font-medium flex items-center">
+                                <IndianRupee className="h-4 w-4" />1699
+                              </span>
+                            </>
+                          )}
                         </Button>
                       </div>
                     </div>
@@ -154,13 +217,77 @@ export default function ProfilePage() {
               <TabsContent value="history">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Credit History</CardTitle>
-                    <CardDescription>Your credit usage history</CardDescription>
+                    <CardTitle>Transaction History</CardTitle>
+                    <CardDescription>Your credit purchase and usage history</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-center py-8 text-muted-foreground">
-                      <p>No credit history available yet</p>
-                    </div>
+                    {transactionsLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin" />
+                        <span className="ml-2">Loading transactions...</span>
+                      </div>
+                    ) : transactions.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <p>No transaction history available yet</p>
+                        <p className="text-sm mt-2">Purchase credits to see your transaction history here</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {transactions.map((transaction) => (
+                          <div
+                            key={transaction.id}
+                            className="flex items-center justify-between p-4 border rounded-lg"
+                          >
+                            <div className="flex items-center space-x-4">
+                              <div className="flex items-center justify-center w-10 h-10 rounded-full">
+                                {transaction.status === "success" && (
+                                  <CheckCircle className="h-6 w-6 text-green-500" />
+                                )}
+                                {transaction.status === "failed" && (
+                                  <XCircle className="h-6 w-6 text-red-500" />
+                                )}
+                                {transaction.status === "pending" && (
+                                  <Clock className="h-6 w-6 text-yellow-500" />
+                                )}
+                              </div>
+                              <div>
+                                <p className="font-medium">{transaction.description}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {new Date(transaction.timestamp).toLocaleString()}
+                                </p>
+                                {transaction.error && (
+                                  <p className="text-sm text-red-500 mt-1">
+                                    Error: {transaction.error.description}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="flex items-center space-x-2">
+                                <Badge
+                                  variant={
+                                    transaction.status === "success"
+                                      ? "default"
+                                      : transaction.status === "failed"
+                                      ? "destructive"
+                                      : "secondary"
+                                  }
+                                >
+                                  {transaction.status}
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                {transaction.credits} credits
+                              </p>
+                              <p className="font-medium flex items-center justify-end">
+                                <IndianRupee className="h-4 w-4" />
+                                {transaction.amount}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>

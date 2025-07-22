@@ -6,27 +6,40 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Progress } from "@/components/ui/progress"
 import { Coins, AlertTriangle, CreditCard } from "lucide-react"
 import { useState } from "react"
+import { useRazorpay } from "@/hooks/use-razorpay"
+import { useToast } from "@/hooks/use-toast"
 
 export function CreditDisplay() {
-  const { user, addCredits } = useAuthContext()
-  const [isLoading, setIsLoading] = useState(false)
+  const { user, refreshUserData, addCredits } = useAuthContext()
+  const { makePayment, isLoading } = useRazorpay()
+  const { toast } = useToast()
   const [showPurchase, setShowPurchase] = useState(false)
 
   if (!user) {
     return null
   }
 
-  const creditStatus = user.credits > 50 ? "good" : user.credits > 10 ? "warning" : "critical"
+  const creditStatus = (user.credits ?? 0) > 50 ? "good" : (user.credits ?? 0) > 10 ? "warning" : "critical"
 
-  const handlePurchaseCredits = async (amount: number) => {
-    setIsLoading(true)
+  const handlePurchaseCredits = async (credits: number, amount: number) => {
     try {
-      await addCredits(amount)
+      console.log(`Initiating payment for ${credits} credits at ₹${amount}`)
+      await makePayment({ credits, amount })
+      
+      // The makePayment function handles payment and credit addition
       setShowPurchase(false)
+      
+      toast({
+        title: "Payment Completed",
+        description: `Your account has been updated with ${credits} credits`,
+      })
     } catch (error) {
       console.error("Error purchasing credits:", error)
-    } finally {
-      setIsLoading(false)
+      toast({
+        title: "Payment Error",
+        description: "Failed to process payment. Please try again.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -56,7 +69,7 @@ export function CreditDisplay() {
             </div>
 
             <Progress
-              value={(user.credits / 100) * 100}
+              value={((user.credits ?? 0) / 100) * 100}
               className={
                 creditStatus === "good" ? "bg-green-100" : creditStatus === "warning" ? "bg-amber-100" : "bg-red-100"
               }
@@ -96,7 +109,7 @@ export function CreditDisplay() {
               <Button
                 variant="outline"
                 className="flex flex-col items-center justify-center h-24"
-                onClick={() => handlePurchaseCredits(50)}
+                onClick={() => handlePurchaseCredits(50, 499)}
                 disabled={isLoading}
               >
                 <span className="text-2xl font-bold">50</span>
@@ -105,7 +118,7 @@ export function CreditDisplay() {
               <Button
                 variant="outline"
                 className="flex flex-col items-center justify-center h-24 border-2 border-blue-500"
-                onClick={() => handlePurchaseCredits(100)}
+                onClick={() => handlePurchaseCredits(100, 899)}
                 disabled={isLoading}
               >
                 <span className="text-2xl font-bold">100</span>
@@ -115,7 +128,7 @@ export function CreditDisplay() {
               <Button
                 variant="outline"
                 className="flex flex-col items-center justify-center h-24"
-                onClick={() => handlePurchaseCredits(200)}
+                onClick={() => handlePurchaseCredits(200, 1699)}
                 disabled={isLoading}
               >
                 <span className="text-2xl font-bold">200</span>
