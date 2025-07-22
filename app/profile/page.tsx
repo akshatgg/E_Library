@@ -2,13 +2,14 @@
 
 import { useAuthContext } from "@/components/auth-provider"
 import { CreditDisplay } from "@/components/credit-system/credit-display"
+import { TransactionDetailsDialog } from "@/components/transaction-details-dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { useRouter } from "next/navigation"
-import { useEffect } from "react"
-import { User, CreditCard, History, Settings, IndianRupee, Clock, CheckCircle, XCircle, Loader2 } from "lucide-react"
+import { useEffect, useState } from "react"
+import { User, CreditCard, History, Settings, IndianRupee, Clock, CheckCircle, XCircle, Loader2, RefreshCw, Eye } from "lucide-react"
 import { useRazorpay } from "@/hooks/use-razorpay"
 import { useTransactionHistory } from "@/hooks/use-transaction-history"
 import { useToast } from "@/hooks/use-toast"
@@ -19,6 +20,8 @@ export default function ProfilePage() {
   const { makePayment, isLoading: isPaymentLoading } = useRazorpay()
   const { transactions, loading: transactionsLoading, refetch } = useTransactionHistory()
   const { toast } = useToast()
+  const [selectedTransaction, setSelectedTransaction] = useState<any>(null)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -28,12 +31,19 @@ export default function ProfilePage() {
 
   const handleCreditPurchase = async (credits: number, amount: number) => {
     try {
-      await makePayment({ credits, amount })
-      // Refetch transactions and refresh user data after successful payment
-      await Promise.all([
-        refetch(),
-        refreshUserData()
-      ])
+      await makePayment({ 
+        credits, 
+        amount,
+        onSuccess: async (transaction) => {
+          console.log("Payment success callback triggered:", transaction)
+          // Refetch transactions and refresh user data after successful payment
+          await Promise.all([
+            refetch(),
+            refreshUserData()
+          ])
+          console.log("Transaction history and user data refreshed")
+        }
+      })
     } catch (error) {
       console.error("Payment error:", error)
       toast({
@@ -42,6 +52,11 @@ export default function ProfilePage() {
         variant: "destructive",
       })
     }
+  }
+
+  const handleTransactionClick = (transaction: any) => {
+    setSelectedTransaction(transaction)
+    setIsDialogOpen(true)
   }
 
   if (!user) {
@@ -217,8 +232,21 @@ export default function ProfilePage() {
               <TabsContent value="history">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Transaction History</CardTitle>
-                    <CardDescription>Your credit purchase and usage history</CardDescription>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle>Transaction History</CardTitle>
+                        <CardDescription>Your credit purchase and usage history</CardDescription>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={refetch}
+                        disabled={transactionsLoading}
+                      >
+                        <RefreshCw className={`h-4 w-4 mr-2 ${transactionsLoading ? 'animate-spin' : ''}`} />
+                        Refresh
+                      </Button>
+                    </div>
                   </CardHeader>
                   <CardContent>
                     {transactionsLoading ? (
@@ -232,57 +260,65 @@ export default function ProfilePage() {
                         <p className="text-sm mt-2">Purchase credits to see your transaction history here</p>
                       </div>
                     ) : (
-                      <div className="space-y-4">
+                      <div className="space-y-3">
                         {transactions.map((transaction) => (
                           <div
                             key={transaction.id}
-                            className="flex items-center justify-between p-4 border rounded-lg"
+                            onClick={() => handleTransactionClick(transaction)}
+                            className="border rounded-lg p-4 bg-card hover:bg-accent/50 transition-colors cursor-pointer group"
                           >
-                            <div className="flex items-center space-x-4">
-                              <div className="flex items-center justify-center w-10 h-10 rounded-full">
-                                {transaction.status === "success" && (
-                                  <CheckCircle className="h-6 w-6 text-green-500" />
-                                )}
-                                {transaction.status === "failed" && (
-                                  <XCircle className="h-6 w-6 text-red-500" />
-                                )}
-                                {transaction.status === "pending" && (
-                                  <Clock className="h-6 w-6 text-yellow-500" />
-                                )}
-                              </div>
-                              <div>
-                                <p className="font-medium">{transaction.description}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  {new Date(transaction.timestamp).toLocaleString()}
-                                </p>
-                                {transaction.error && (
-                                  <p className="text-sm text-red-500 mt-1">
-                                    Error: {transaction.error.description}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-3">
+                                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-muted">
+                                  {transaction.status === "success" && (
+                                    <CheckCircle className="h-5 w-5 text-green-500" />
+                                  )}
+                                  {transaction.status === "failed" && (
+                                    <XCircle className="h-5 w-5 text-red-500" />
+                                  )}
+                                  {transaction.status === "pending" && (
+                                    <Clock className="h-5 w-5 text-yellow-500" />
+                                  )}
+                                </div>
+                                <div className="flex-1">
+                                  <div className="flex items-center space-x-2 mb-1">
+                                    <h4 className="font-medium text-sm">{transaction.description}</h4>
+                                    <Badge
+                                      variant={
+                                        transaction.status === "success"
+                                          ? "default"
+                                          : transaction.status === "failed"
+                                          ? "destructive"
+                                          : "secondary"
+                                      }
+                                      className="text-xs"
+                                    >
+                                      {transaction.status.toUpperCase()}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground">
+                                    {new Date(transaction.timestamp).toLocaleDateString()} at{" "}
+                                    {new Date(transaction.timestamp).toLocaleTimeString([], { 
+                                      hour: '2-digit', 
+                                      minute: '2-digit' 
+                                    })}
                                   </p>
-                                )}
+                                </div>
                               </div>
-                            </div>
-                            <div className="text-right">
-                              <div className="flex items-center space-x-2">
-                                <Badge
-                                  variant={
-                                    transaction.status === "success"
-                                      ? "default"
-                                      : transaction.status === "failed"
-                                      ? "destructive"
-                                      : "secondary"
-                                  }
-                                >
-                                  {transaction.status}
-                                </Badge>
+                              
+                              <div className="flex items-center space-x-3">
+                                <div className="text-right">
+                                  <div className="flex items-center space-x-1">
+                                    <span className="text-sm font-semibold text-green-600">+{transaction.credits}</span>
+                                    <span className="text-xs text-muted-foreground">credits</span>
+                                  </div>
+                                  <div className="flex items-center justify-end space-x-1">
+                                    <IndianRupee className="h-3 w-3 text-muted-foreground" />
+                                    <span className="text-sm font-medium">{transaction.amount}</span>
+                                  </div>
+                                </div>
+                                <Eye className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                               </div>
-                              <p className="text-sm text-muted-foreground mt-1">
-                                {transaction.credits} credits
-                              </p>
-                              <p className="font-medium flex items-center justify-end">
-                                <IndianRupee className="h-4 w-4" />
-                                {transaction.amount}
-                              </p>
                             </div>
                           </div>
                         ))}
@@ -318,6 +354,13 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Transaction Details Dialog */}
+      <TransactionDetailsDialog
+        transaction={selectedTransaction}
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+      />
     </div>
   )
 }

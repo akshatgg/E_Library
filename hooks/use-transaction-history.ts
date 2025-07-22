@@ -1,8 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { doc, getDoc } from "firebase/firestore"
-import { db } from "@/lib/firebase"
 import { useAuthContext } from "@/components/auth-provider"
 
 interface Transaction {
@@ -24,7 +22,7 @@ export function useTransactionHistory() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const { user } = useAuthContext()
+  const { user, getTransactions } = useAuthContext()
 
   const fetchTransactions = async () => {
     if (!user) {
@@ -36,67 +34,29 @@ export function useTransactionHistory() {
       setLoading(true)
       setError(null)
       
-      // Try Firebase first
-      try {
-        const userRef = doc(db, "users", user.uid)
-        const userDoc = await getDoc(userRef)
+      console.log("Fetching transactions for user:", user.uid)
+      
+      // Use the auth provider's getTransactions method which handles Firebase and fallback
+      const userTransactions = await getTransactions()
+      
+      console.log("Fetched transactions:", userTransactions.length)
+      
+      // Sort transactions by timestamp (newest first)
+      const sortedTransactions = userTransactions
+        .map((transaction: any) => ({
+          ...transaction,
+          timestamp: transaction.timestamp instanceof Date ? 
+            transaction.timestamp : 
+            new Date(transaction.timestamp)
+        }))
+        .sort((a: Transaction, b: Transaction) => 
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        )
 
-        if (userDoc.exists()) {
-          const userData = userDoc.data()
-          const userTransactions = userData.transactions || []
-          
-          if (userTransactions.length > 0) {
-            // Sort transactions by timestamp (newest first)
-            const sortedTransactions = userTransactions
-              .map((transaction: any) => ({
-                ...transaction,
-                timestamp: transaction.timestamp?.toDate ? 
-                  transaction.timestamp.toDate() : 
-                  transaction.timestamp?.seconds ? 
-                    new Date(transaction.timestamp.seconds * 1000) :
-                    new Date(transaction.timestamp)
-              }))
-              .sort((a: Transaction, b: Transaction) => 
-                new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-              )
-
-            setTransactions(sortedTransactions)
-            return
-          }
-        }
-      } catch (firebaseError) {
-        console.log("Firebase fetch failed, trying simple storage:", firebaseError)
-      }
-
-      // Fallback to simple storage API
-      try {
-        const response = await fetch(`/api/user/transactions?userId=${user.uid}`)
-        if (response.ok) {
-          const data = await response.json()
-          const userTransactions = data.transactions || []
-          
-          // Sort transactions by timestamp (newest first)
-          const sortedTransactions = userTransactions
-            .map((transaction: any) => ({
-              ...transaction,
-              timestamp: new Date(transaction.timestamp)
-            }))
-            .sort((a: Transaction, b: Transaction) => 
-              new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-            )
-
-          setTransactions(sortedTransactions)
-          return
-        }
-      } catch (apiError) {
-        console.log("Simple storage API failed:", apiError)
-      }
-
-      // If both fail, set empty array
-      setTransactions([])
+      setTransactions(sortedTransactions)
     } catch (err) {
       console.error("Error fetching transactions:", err)
-      setError("Failed to fetch transaction history")
+      setError(err instanceof Error ? err.message : "Failed to fetch transactions")
       setTransactions([])
     } finally {
       setLoading(false)
@@ -108,6 +68,7 @@ export function useTransactionHistory() {
   }, [user?.uid]) // Only depend on user ID, not the entire user object
 
   const refetch = () => {
+    console.log("Manual transaction refetch triggered")
     fetchTransactions()
   }
 

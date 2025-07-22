@@ -13,6 +13,7 @@ declare global {
 interface PaymentOptions {
   credits: number
   amount: number
+  onSuccess?: (transaction: any) => Promise<void>
 }
 
 interface Transaction {
@@ -49,7 +50,7 @@ export function useRazorpay() {
     })
   }
 
-  const makePayment = async ({ credits, amount }: PaymentOptions) => {
+  const makePayment = async ({ credits, amount, onSuccess }: PaymentOptions) => {
     if (!user) {
       toast({
         title: "Error",
@@ -169,17 +170,53 @@ export function useRazorpay() {
               description: `${credits} credits have been added to your account`,
             })
 
-            // Add credits using the auth provider function (this updates Firebase)
+            // Add credits using the auth provider function with transaction data
             try {
               console.log(`Adding ${credits} credits to user account via addCredits function...`)
-              await addCredits(credits)
-              console.log("Credits added successfully via addCredits function")
+              
+              // Create transaction data for Firebase storage
+              const transactionData = {
+                id: response.razorpay_payment_id,
+                orderId: response.razorpay_order_id,
+                type: "purchase" as const,
+                credits: credits,
+                amount: amount,
+                status: "success" as const,
+                description: `Purchased ${credits} credits`,
+              }
+              
+              await addCredits(credits, transactionData)
+              console.log("Credits and transaction added successfully via addCredits function")
+              
+              // Force refresh user data and trigger callbacks
+              await refreshUserData()
+              
+              // Call onSuccess callback if provided
+              if (onSuccess) {
+                console.log("Calling onSuccess callback...")
+                await onSuccess(transactionData)
+              }
+              
             } catch (creditError) {
               console.error("Failed to add credits via addCredits function:", creditError)
               // Fallback to refresh user data
               setTimeout(async () => {
                 console.log("Fallback: Refreshing user data after payment success...")
                 await refreshUserData()
+                
+                // Still call onSuccess callback even in fallback
+                if (onSuccess) {
+                  console.log("Calling onSuccess callback in fallback...")
+                  await onSuccess({
+                    id: response.razorpay_payment_id,
+                    orderId: response.razorpay_order_id,
+                    type: "purchase",
+                    credits: credits,
+                    amount: amount,
+                    status: "success",
+                    description: `Purchased ${credits} credits`,
+                  })
+                }
               }, 1000)
             }
             

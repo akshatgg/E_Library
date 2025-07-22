@@ -52,7 +52,7 @@
     "cmdk": "latest",
     "cookies-next": "^2.1.0",
     "d3": "latest",
-    "date-fns": "latest",
+    "date-fns": "^4.1.0",
     "embla-carousel-react": "latest",
     "firebase": "^11.10.0",
     "firebase-admin": "^13.4.0",

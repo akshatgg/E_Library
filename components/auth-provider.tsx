@@ -11,7 +11,7 @@ import {
   sendEmailVerification,
   sendPasswordResetEmail,
 } from "firebase/auth";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc, collection, addDoc, query, where, orderBy, getDocs } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 
 export interface User {
@@ -22,6 +22,18 @@ export interface User {
   createdAt: Date;
   lastLogin: Date;
   role: "admin" | "user";
+}
+
+export interface Transaction {
+  id: string;
+  orderId: string;
+  type: "purchase" | "usage" | "refund";
+  credits: number;
+  amount?: number;
+  status: "success" | "failed" | "pending";
+  timestamp: Date;
+  description: string;
+  userId: string;
 }
 
 interface AuthContextType {
@@ -35,9 +47,11 @@ interface AuthContextType {
     displayName: string
   ) => Promise<void>;
   signOut: () => Promise<void>;
-  addCredits: (amount: number) => Promise<User>;
+  addCredits: (amount: number, transaction?: Partial<Transaction>) => Promise<User>;
   useCredits: (amount: number) => Promise<User>;
   refreshUserData: () => Promise<void>;
+  getTransactions: () => Promise<Transaction[]>;
+  addTransaction: (transaction: Omit<Transaction, 'userId'>) => Promise<void>;
   isAuthenticated: boolean;
   resetPassword: (email: string) => Promise<void>;
 }
@@ -340,20 +354,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     console.log("Refreshing user data for:", user.uid);
     
-    // Try to fetch updated credit data from both sources
+    // Try to fetch updated data from Firebase client SDK first
     try {
-      // Try Firebase first
       const userRef = doc(db, "users", user.uid);
       const docSnap = await getDoc(userRef);
 
       if (docSnap.exists()) {
-        const userData = docSnap.data() as User;
-        console.log("Firebase refresh - old credits:", user.credits, "new credits:", userData.credits);
+        const userData = docSnap.data();
+        console.log("Firebase client refresh - old credits:", user.credits, "new credits:", userData.credits);
         setUser({ ...user, credits: userData.credits });
         return;
       }
     } catch (firebaseError) {
-      console.log("Firebase refresh failed, trying simple storage:", firebaseError);
+      console.log("Firebase client refresh failed, trying simple storage:", firebaseError);
     }
 
     // Fallback to simple storage API
@@ -372,7 +385,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const addCredits = async (amount: number) => {
+  const addCredits = async (amount: number, transaction?: Partial<Transaction>) => {
     if (!user) throw new Error("Not authenticated");
     
     // Check token integrity before making changes
@@ -387,14 +400,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       credits: (user.credits || 0) + amount,
     };
     
-    // Try Firebase first
+    // Try Firebase client SDK first
     try {
-      await setDoc(doc(db, "users", user.uid), updated);
-      console.log("Credits added successfully via Firebase");
+      const userRef = doc(db, "users", user.uid);
+      await setDoc(userRef, updated);
+      console.log("Credits updated successfully via Firebase client SDK");
+      
+      // If transaction data is provided, store it in Firebase
+      if (transaction) {
+        const transactionData: Transaction = {
+          userId: user.uid,
+          timestamp: new Date(),
+          type: "purchase",
+          status: "success",
+          credits: amount,
+          ...transaction,
+        } as Transaction;
+        
+        await addDoc(collection(db, "transactions"), transactionData);
+        console.log("Transaction stored in Firebase:", transactionData);
+      }
+      
       setUser(updated);
       return updated;
     } catch (firebaseError) {
-      console.log("Firebase addCredits failed, trying simple storage API:", firebaseError);
+      console.log("Firebase client addCredits failed, trying simple storage API:", firebaseError);
       
       // Fallback to simple storage API
       try {
@@ -452,6 +482,80 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const getTransactions = async (): Promise<Transaction[]> => {
+    if (!user) throw new Error("Not authenticated");
+    
+    // Check token integrity before fetching data
+    if (!checkTokenIntegrity()) {
+      throw new Error("Authentication expired");
+    }
+    
+    try {
+      // Try Firebase client SDK first
+      const transactionsRef = collection(db, "transactions");
+      const q = query(
+        transactionsRef,
+        where("userId", "==", user.uid),
+        orderBy("timestamp", "desc")
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const transactions: Transaction[] = [];
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        transactions.push({
+          ...data,
+          timestamp: data.timestamp?.toDate ? data.timestamp.toDate() : new Date(data.timestamp),
+        } as Transaction);
+      });
+      
+      console.log("Transactions fetched from Firebase client SDK:", transactions.length);
+      return transactions;
+    } catch (firebaseError) {
+      console.log("Firebase client transactions fetch failed, trying simple storage API:", firebaseError);
+      
+      // Fallback to simple storage API
+      try {
+        const response = await fetch(`/api/user/transactions?userId=${user.uid}`);
+        if (response.ok) {
+          const data = await response.json();
+          return data.transactions || [];
+        } else {
+          throw new Error("Simple storage API failed");
+        }
+      } catch (apiError) {
+        console.error("Both Firebase and simple storage transactions fetch failed:", apiError);
+        return [];
+      }
+    }
+  };
+
+  const addTransaction = async (transaction: Omit<Transaction, 'userId'>) => {
+    if (!user) throw new Error("Not authenticated");
+    
+    // Check token integrity before making changes
+    if (!checkTokenIntegrity()) {
+      throw new Error("Authentication expired");
+    }
+    
+    try {
+      const transactionData: Transaction = {
+        ...transaction,
+        userId: user.uid,
+        timestamp: transaction.timestamp || new Date(),
+      };
+      
+      // Try Firebase first
+      await addDoc(collection(db, "transactions"), transactionData);
+      console.log("Transaction added to Firebase:", transactionData);
+    } catch (firebaseError) {
+      console.log("Firebase transaction add failed:", firebaseError);
+      // Note: Simple storage doesn't have a direct transaction add endpoint
+      // Transactions are handled via the payment verification endpoints
+    }
+  };
+
   const value: AuthContextType = {
     user,
     loading,
@@ -462,6 +566,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     addCredits,
     useCredits,
     refreshUserData,
+    getTransactions,
+    addTransaction,
     isAuthenticated: !!user && !isTokenExpired(),
     resetPassword,
   };
