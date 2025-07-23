@@ -52,6 +52,7 @@ interface AuthContextType {
   refreshUserData: () => Promise<void>;
   getTransactions: () => Promise<Transaction[]>;
   addTransaction: (transaction: Omit<Transaction, 'userId'>) => Promise<void>;
+  updateProfile: (updates: Partial<Pick<User, 'displayName'>>) => Promise<void>;
   isAuthenticated: boolean;
   resetPassword: (email: string) => Promise<void>;
 }
@@ -556,6 +557,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateProfile = async (updates: Partial<Pick<User, 'displayName'>>) => {
+    if (!user) throw new Error("Not authenticated");
+    
+    // Check token integrity before making changes
+    if (!checkTokenIntegrity()) {
+      throw new Error("Authentication expired");
+    }
+    
+    try {
+      const updatedUser = {
+        ...user,
+        ...updates,
+      };
+      
+      // Try Firebase client SDK first
+      const userRef = doc(db, "users", user.uid);
+      await setDoc(userRef, updatedUser);
+      console.log("Profile updated successfully via Firebase client SDK");
+      
+      setUser(updatedUser);
+    } catch (firebaseError) {
+      console.error("Firebase profile update failed:", firebaseError);
+      throw new Error("Failed to update profile");
+    }
+  };
+
   const value: AuthContextType = {
     user,
     loading,
@@ -568,6 +595,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshUserData,
     getTransactions,
     addTransaction,
+    updateProfile,
     isAuthenticated: !!user && !isTokenExpired(),
     resetPassword,
   };

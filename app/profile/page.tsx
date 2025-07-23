@@ -3,6 +3,7 @@
 import { useAuthContext } from "@/components/auth-provider"
 import { CreditDisplay } from "@/components/credit-system/credit-display"
 import { TransactionDetailsDialog } from "@/components/transaction-details-dialog"
+import { EditProfileDialog } from "@/components/edit-profile-dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -22,6 +23,7 @@ export default function ProfilePage() {
   const { toast } = useToast()
   const [selectedTransaction, setSelectedTransaction] = useState<any>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false)
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -338,7 +340,7 @@ export default function ProfilePage() {
                 <CardTitle className="text-lg">Account Settings</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Button variant="outline" className="w-full justify-start">
+                <Button variant="outline" className="w-full justify-start" onClick={() => setIsEditProfileOpen(true)}>
                   <Settings className="mr-2 h-4 w-4" />
                   Edit Profile
                 </Button>
@@ -360,6 +362,12 @@ export default function ProfilePage() {
         transaction={selectedTransaction}
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
+      />
+
+      {/* Edit Profile Dialog */}
+      <EditProfileDialog
+        open={isEditProfileOpen}
+        onOpenChange={setIsEditProfileOpen}
       />
     </div>
   )
