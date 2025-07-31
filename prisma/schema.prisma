@@ -1,0 +1,98 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enum for case categories
+enum CaseCategory {
+  ITAT
+  GST
+  INCOME_TAX
+  HIGH_COURT
+  SUPREME_COURT
+  OTHER
+}
+
+// Enum for case outcomes
+enum CaseOutcome {
+  allowed
+  dismissed
+  partly_allowed
+}
+
+// Table 1: Basic Case Laws Data (from dashboard search results)
+model CaseLaw {
+  id                String        @id @default(cuid())
+  tid               Int           @unique // Indian Kanoon TID - connects both tables
+  title             String        @db.Text
+  court             String        // item.docsource
+  date              String        // item.publishdate
+  bench             String?       // item.bench
+  category          CaseCategory  // mapped from docsource
+  outcome           CaseOutcome   @default(allowed)
+  
+  // Parties (currently empty strings but structure ready)
+  appellant         String?
+  respondent        String?
+  
+  caseNumber        String        // item.tid as string
+  summary           String        @db.Text // cleanHeadline
+  url               String        // https://indiankanoon.org/doc/${item.tid}
+  
+  // Arrays for future use
+  relevantSections  String[]      @default([])
+  keywords          String[]      @default([])
+  legalPoints       String[]      @default([])
+  
+  // Timestamps
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  
+  // Relation to detailed case data
+  caseDetail        CaseDetail?
+  
+  @@map("case_laws")
+  @@index([tid])
+  @@index([category])
+  @@index([date])
+}
+
+// Table 2: Detailed Case Data (from individual case API calls)
+model CaseDetail {
+  id            String    @id @default(cuid())
+  tid           Int       @unique // Links to CaseLaw table
+  
+  // Core API response fields
+  publishdate   String    // Same as date but from detail API
+  title         String    @db.Text // Full title from detail API
+  doc           String    @db.Text // Full case document HTML content
+  numcites      Int       @default(0) // Number of citations in this case
+  numcitedby    Int       @default(0) // Number of times this case is cited
+  docsource     String    // Source tribunal/court
+  citetid       Int?      // Reference to another case TID
+  divtype       String?   // Document type (judgment, order, etc.)
+  courtcopy     Boolean   @default(false) // Whether it's an official court copy
+  agreement     Boolean   @default(false) // Agreement status
+  
+  // Query alert data (flexible JSON)
+  queryAlert    Json?     // query_alert field from API
+  
+  // Timestamps
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relation back to basic case law
+  caseLaw       CaseLaw   @relation(fields: [tid], references: [tid], onDelete: Cascade)
+  
+  @@map("case_details")
+  @@index([tid])
+  @@index([numcitedby])
+  @@index([docsource])
+}
