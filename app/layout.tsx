@@ -6,6 +6,8 @@ import { AuthProvider } from "@/components/auth-provider"
 import { Toaster } from "@/components/ui/toaster"
 import "./globals.css"
 import AppLayouts from "@/layouts/AppLayouts"
+// Initialize cron jobs
+import "@/lib/cron-jobs"
 
 const inter = Inter({ subsets: ["latin"] })
 

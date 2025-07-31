@@ -34,10 +34,13 @@ export async function fetchIndianKanoonData(props: FetchKanoonProps = {}): Promi
     // ✅ Append year to formInput if provided
     const finalQuery = year ? `${formInput} ${year}` : formInput;
 
+    console.log(`🔍 Searching Indian Kanoon with query: "${finalQuery}", page: ${pagenum}`);
+
     const params = new URLSearchParams();
     params.append("formInput", finalQuery);
     params.append("pagenum", pagenum.toString());
 
+    // Improved axios configuration
     const response = await axios.post(
       `https://api.indiankanoon.org/search/`,
       params,
@@ -46,14 +49,44 @@ export async function fetchIndianKanoonData(props: FetchKanoonProps = {}): Promi
           Authorization: `Token ${INDIAN_KANOON_TOKEN}`,
           Accept: "application/json",
           "Content-Type": "application/x-www-form-urlencoded",
+          "User-Agent": "Mozilla/5.0 (compatible; E-Library/1.0)",
         },
+        timeout: 30000, // 30 second timeout
+        maxRedirects: 5,
+        validateStatus: (status) => status >= 200 && status < 300,
       }
     );
-console.log("Response Data:", response.data);
 
-    return response.data?.docs || [];
-  } catch (error) {
-    console.error("Error fetching Indian Kanoon data:", error);
+    console.log("✅ API Response received, status:", response.status);
+    console.log("📊 Response data keys:", Object.keys(response.data || {}));
+    
+    if (response.data?.docs) {
+      console.log(`📄 Found ${response.data.docs.length} cases`);
+      return response.data.docs;
+    } else {
+      console.warn("⚠️ No 'docs' field in response");
+      console.log("Response structure:", response.data);
+      return [];
+    }
+
+  } catch (error: any) {
+    console.error("❌ Error fetching Indian Kanoon data:");
+    
+    if (error.response) {
+      // Server responded with error status
+      console.error(`   Status: ${error.response.status}`);
+      console.error(`   StatusText: ${error.response.statusText}`);
+      console.error(`   Data:`, error.response.data);
+    } else if (error.request) {
+      // Request was made but no response received
+      console.error("   No response received from server");
+      console.error("   Error code:", error.code);
+      console.error("   Error message:", error.message);
+    } else {
+      // Something else happened
+      console.error("   Setup error:", error.message);
+    }
+    
     return [];
   }
 }

@@ -10,89 +10,74 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Enum for case categories
-enum CaseCategory {
-  ITAT
-  GST
-  INCOME_TAX
-  HIGH_COURT
-  SUPREME_COURT
-  OTHER
-}
-
-// Enum for case outcomes
-enum CaseOutcome {
-  allowed
-  dismissed
-  partly_allowed
-}
-
-// Table 1: Basic Case Laws Data (from dashboard search results)
+// Main table for case law data (from API search results)
 model CaseLaw {
-  id                String        @id @default(cuid())
-  tid               Int           @unique // Indian Kanoon TID - connects both tables
-  title             String        @db.Text
-  court             String        // item.docsource
-  date              String        // item.publishdate
-  bench             String?       // item.bench
-  category          CaseCategory  // mapped from docsource
-  outcome           CaseOutcome   @default(allowed)
+  id          String   @id @default(cuid())
+  tid         Int      @unique // Original tid from API
+  authorid    Int?     @map("author_id")
+  bench       String?
+  catids      String?  @map("cat_ids")
+  docsize     Int?     @map("doc_size")
+  docsource   String   @map("doc_source")
+  doctype     Int?     @map("doc_type")
+  fragment    Boolean? @default(false)
+  headline    String?  @db.Text // Can contain HTML, so using Text
+  numcitedby  Int      @default(0) @map("num_cited_by")
+  numcites    Int      @default(0) @map("num_cites")
+  publishdate String   @map("publish_date")
+  title       String   @db.Text // Can contain HTML formatting
   
-  // Parties (currently empty strings but structure ready)
-  appellant         String?
-  respondent        String?
+  // Additional category field for mapping docsource to category
+  category    CaseCategory? // Will be populated based on docsource mapping
   
-  caseNumber        String        // item.tid as string
-  summary           String        @db.Text // cleanHeadline
-  url               String        // https://indiankanoon.org/doc/${item.tid}
-  
-  // Arrays for future use
-  relevantSections  String[]      @default([])
-  keywords          String[]      @default([])
-  legalPoints       String[]      @default([])
-  
-  // Timestamps
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-  
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
   // Relation to detailed case data
-  caseDetail        CaseDetail?
-  
-  @@map("case_laws")
+  caseDetail CaseDetail?
+
   @@index([tid])
   @@index([category])
-  @@index([date])
+  @@index([publishdate])
+  @@index([docsource])
+  @@map("case_laws")
 }
 
-// Table 2: Detailed Case Data (from individual case API calls)
+// Detailed table for full case document data (from individual case API)
 model CaseDetail {
-  id            String    @id @default(cuid())
-  tid           Int       @unique // Links to CaseLaw table
+  id           String   @id @default(cuid())
+  tid          Int      @unique // Foreign key reference
+  agreement    Boolean  @default(false)
+  citetid      Int?     @map("cite_tid") // Made nullable to match your data
+  courtcopy    Boolean  @default(false) @map("court_copy")
+  divtype      String?  @map("div_type") // Made nullable to match your data
+  doc          String   @db.Text // Full HTML document content
+  docsource    String   @map("doc_source")
+  numcitedby   Int      @default(0) @map("num_cited_by")
+  numcites     Int      @default(0) @map("num_cites")
+  publishdate  String   @map("publish_date")
+  queryAlert   Json?    @map("query_alert") // Using Json for flexible data (can be null)
+  title        String   @db.Text
   
-  // Core API response fields
-  publishdate   String    // Same as date but from detail API
-  title         String    @db.Text // Full title from detail API
-  doc           String    @db.Text // Full case document HTML content
-  numcites      Int       @default(0) // Number of citations in this case
-  numcitedby    Int       @default(0) // Number of times this case is cited
-  docsource     String    // Source tribunal/court
-  citetid       Int?      // Reference to another case TID
-  divtype       String?   // Document type (judgment, order, etc.)
-  courtcopy     Boolean   @default(false) // Whether it's an official court copy
-  agreement     Boolean   @default(false) // Agreement status
-  
-  // Query alert data (flexible JSON)
-  queryAlert    Json?     // query_alert field from API
-  
-  // Timestamps
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  // Relation back to basic case law
-  caseLaw       CaseLaw   @relation(fields: [tid], references: [tid], onDelete: Cascade)
-  
-  @@map("case_details")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relation back to main case law
+  caseLaw CaseLaw @relation(fields: [tid], references: [tid], onDelete: Cascade)
+
   @@index([tid])
   @@index([numcitedby])
   @@index([docsource])
+  @@map("case_details")
+}
+
+// Enum for case categories (based on your specified options)
+enum CaseCategory {
+  ALL_CATEGORIES  @map("all categories")
+  ITAT
+  GST
+  INCOME_TAX      @map("Income tax")
+  HIGH_COURT      @map("High Court")
+  SUPREME_COURT   @map("Supreme court")
+  TRIBUNAL_COURT  @map("tribunal court")
 }
