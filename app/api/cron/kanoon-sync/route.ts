@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { runManualSync, getSyncStatus } from '@/lib/cron-jobs/kanoon-sync';
+import { runManualSync, getSyncStatus, getAllCategoriesStatus } from '@/lib/cron-jobs/kanoon-sync';
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,8 +11,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Get category from query parameters or request body
+    const { searchParams } = new URL(request.url);
+    const category = searchParams.get('category');
+
     console.log('🔧 Manual sync triggered via API');
-    const result = await runManualSync();
+    if (category) {
+      console.log(`🎯 Targeting category: ${category}`);
+    }
+    
+    const result = await runManualSync(category || undefined);
     
     return NextResponse.json({ 
       success: true, 
@@ -30,7 +38,16 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const status = await getSyncStatus();
+    const { searchParams } = new URL(request.url);
+    const category = searchParams.get('category');
+    const showAll = searchParams.get('all') === 'true';
+
+    let status;
+    if (showAll) {
+      status = await getAllCategoriesStatus();
+    } else {
+      status = await getSyncStatus(category || undefined);
+    }
     
     return NextResponse.json({
       success: true,

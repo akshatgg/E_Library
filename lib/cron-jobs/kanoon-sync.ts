@@ -38,6 +38,26 @@ async function fetchIndianKanoonDataWithRetry(props: any, maxRetries = 3): Promi
   return [];
 }
 
+// Helper function to get search query for each category
+function getCategorySearchQuery(category: string): string {
+  switch (category) {
+    case "ITAT":
+      return "(income tax appellate tribunal OR ITAT)";
+    case "GST":
+      return "(GST OR goods and services tax)";
+    case "INCOME_TAX":
+      return "(income tax -appellate -tribunal)";
+    case "HIGH_COURT":
+      return "(high court)";
+    case "SUPREME_COURT":
+      return "(supreme court)";
+    case "TRIBUNAL_COURT":
+      return "(tribunal -income -tax)";
+    default:
+      return "(income tax appellate tribunal OR ITAT OR income-tax appellate tribunal OR income tax appellate court)";
+  }
+}
+
 // Helper function to map docsource to category
 function mapDocSourceToCategory(docsource: string): string | null {
   const source = docsource.toLowerCase();
@@ -64,13 +84,30 @@ function mapDocSourceToCategory(docsource: string): string | null {
   return null; // Default to null if no match
 }
 
-async function syncKanoonData() {
+async function syncKanoonData(targetCategory?: string) {
   try {
     console.log('🔄 Starting Kanoon data sync...');
     console.log('📅 Sync time:', new Date().toISOString());
     
+    let searchQuery: string;
+    let categoryFilter: string | null = null;
+    
+    if (targetCategory) {
+      searchQuery = getCategorySearchQuery(targetCategory);
+      categoryFilter = targetCategory;
+      console.log(`🎯 Syncing specific category: ${targetCategory}`);
+      console.log(`🔍 Using search query: ${searchQuery}`);
+    } else {
+      // Default search for all categories
+      searchQuery = "(income tax appellate tribunal OR ITAT OR income-tax appellate tribunal OR income tax appellate court)";
+      console.log('🌐 Syncing all categories with default query');
+    }
+    
     // Fetch cases from page 1 only as requested
-    const cases: IKanoonResult[] = await fetchIndianKanoonDataWithRetry({ pagenum: 1 });
+    const cases: IKanoonResult[] = await fetchIndianKanoonDataWithRetry({ 
+      pagenum: 1,
+      formInput: searchQuery 
+    });
     console.log(`📊 Fetched ${cases.length} cases from Indian Kanoon API (page 1)`);
 
     let newCases = 0;
@@ -89,7 +126,21 @@ async function syncKanoonData() {
         });
 
         // Map docsource to category
-        const category = mapDocSourceToCategory(caseData.docsource);
+        const detectedCategory = mapDocSourceToCategory(caseData.docsource);
+        
+        // Determine final category
+        let finalCategory: string | null;
+        
+        if (categoryFilter) {
+          // When targeting a specific category, save all returned cases with that category
+          // This ensures we get the cases we searched for
+          finalCategory = categoryFilter;
+          console.log(`✅ Processing TID: ${caseData.tid} - Assigning target category: ${finalCategory} (detected: ${detectedCategory})`);
+        } else {
+          // For general sync, use detected category
+          finalCategory = detectedCategory;
+          console.log(`✅ Processing TID: ${caseData.tid} - Using detected category: ${finalCategory}`);
+        }
 
         // Prepare CaseLaw data according to your schema
         const caseLawData = {
@@ -106,7 +157,7 @@ async function syncKanoonData() {
           numcites: 0, // Will be updated from detail API
           publishdate: caseData.publishdate,
           title: caseData.title,
-          category: category as any,
+          category: finalCategory as any,
         };
 
         // Create or update CaseLaw
@@ -198,12 +249,15 @@ async function syncKanoonData() {
     }
 
     const summary = {
+      category: targetCategory || 'ALL',
+      searchQuery: searchQuery,
       newCaseLaws: newCases,
       updatedCaseLaws: updatedCases,
       newCaseDetails: newDetails,
       updatedCaseDetails: updatedDetails,
       errors: errors,
-      totalProcessed: cases.length
+      totalProcessed: cases.length,
+      syncTime: new Date().toISOString()
     };
 
     console.log('✨ Sync completed successfully!');
@@ -232,30 +286,43 @@ async function logSyncStats(summary: any) {
   }
 }
 
-// Schedule cron job to run every 24 hours at 2:00 AM IST
+// Schedule cron jobs for each category to run every 48 hours
 export function startKanoonSyncCron() {
-  console.log('🚀 Starting Kanoon sync cron job...');
-  console.log('⏰ Scheduled to run daily at 2:00 AM IST');
+  console.log('🚀 Starting Kanoon sync cron jobs...');
+  console.log('⏰ Each category scheduled to run every 48 hours');
   
-  // Run every day at 2:00 AM IST
-  cron.schedule('0 2 * * *', async () => {
-    console.log('⏰ Kanoon sync cron job triggered at:', new Date().toISOString());
-    try {
-      await syncKanoonData();
-      console.log('✅ Scheduled sync completed successfully');
-    } catch (error) {
-      console.error('❌ Scheduled sync failed:', error);
-    }
+  const categories = ["ITAT", "GST", "INCOME_TAX", "HIGH_COURT", "SUPREME_COURT", "TRIBUNAL_COURT"];
+  
+  categories.forEach((category, index) => {
+    // Stagger the start times by 4 hours for each category to avoid API overload
+    // ITAT: 2:00 AM, GST: 6:00 AM, INCOME_TAX: 10:00 AM, etc.
+    const startHour = 2 + (index * 4);
+    const cronExpression = `0 ${startHour} */2 * *`; // Every 2 days at specific hour
+    
+    console.log(`📅 Scheduling ${category} sync every 48 hours at ${startHour}:00`);
+    
+    cron.schedule(cronExpression, async () => {
+      console.log(`⏰ ${category} sync cron job triggered at:`, new Date().toISOString());
+      try {
+        await syncKanoonData(category);
+        console.log(`✅ Scheduled ${category} sync completed successfully`);
+      } catch (error) {
+        console.error(`❌ Scheduled ${category} sync failed:`, error);
+      }
+    });
   });
 
-  console.log('✅ Cron job scheduled successfully');
+  console.log('✅ All category cron jobs scheduled successfully');
 }
 
 // Manual sync function for testing
-export async function runManualSync() {
+export async function runManualSync(category?: string) {
   console.log('🔧 Running manual Kanoon sync...');
+  if (category) {
+    console.log(`🎯 Targeting category: ${category}`);
+  }
   try {
-    const result = await syncKanoonData();
+    const result = await syncKanoonData(category);
     console.log('✅ Manual sync completed successfully');
     return result;
   } catch (error) {
@@ -265,16 +332,23 @@ export async function runManualSync() {
 }
 
 // Function to get sync status
-export async function getSyncStatus() {
+export async function getSyncStatus(category?: string) {
   try {
-    const totalCases = await prisma.caseLaw.count();
+    let whereClause = {};
+    if (category) {
+      whereClause = { category: category as any };
+    }
+
+    const totalCases = await prisma.caseLaw.count({ where: whereClause });
     const totalDetails = await prisma.caseDetail.count();
     const lastSync = await prisma.caseLaw.findFirst({
+      where: whereClause,
       orderBy: { updatedAt: 'desc' },
-      select: { updatedAt: true }
+      select: { updatedAt: true, category: true }
     });
 
     return {
+      category: category || 'ALL',
       totalCases,
       totalDetails,
       lastSyncTime: lastSync?.updatedAt || null,
@@ -286,8 +360,28 @@ export async function getSyncStatus() {
   }
 }
 
+// Function to get status for all categories
+export async function getAllCategoriesStatus() {
+  try {
+    const categories = ["ITAT", "GST", "INCOME_TAX", "HIGH_COURT", "SUPREME_COURT", "TRIBUNAL_COURT"];
+    const statusPromises = categories.map(category => getSyncStatus(category));
+    const overallStatus = await getSyncStatus(); // All categories
+    
+    const categoryStatuses = await Promise.all(statusPromises);
+    
+    return {
+      overall: overallStatus,
+      categories: categoryStatuses
+    };
+  } catch (error) {
+    console.error('Error getting all categories status:', error);
+    return null;
+  }
+}
+
 export default { 
   startKanoonSyncCron, 
   runManualSync, 
-  getSyncStatus 
+  getSyncStatus,
+  getAllCategoriesStatus
 };

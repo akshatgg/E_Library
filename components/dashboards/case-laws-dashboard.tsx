@@ -261,7 +261,7 @@ export function CaseLawsDashboard() {
           return "(tribunal)";
         case "all":
         default:
-          return "(gst OR income tax OR ITAT)";
+          return "(gst OR income tax OR ITAT)";   
       }
     } else {
       switch (category) {
