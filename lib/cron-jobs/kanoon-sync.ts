@@ -41,20 +41,20 @@ async function fetchIndianKanoonDataWithRetry(props: any, maxRetries = 3): Promi
 // Helper function to get search query for each category
 function getCategorySearchQuery(category: string): string {
   switch (category) {
-    case "ITAT":
-      return "(income tax appellate tribunal OR ITAT)";
-    case "GST":
-      return "(GST OR goods and services tax)";
-    case "INCOME_TAX":
-      return "(income tax -appellate -tribunal)";
-    case "HIGH_COURT":
-      return "(high court)";
-    case "SUPREME_COURT":
-      return "(supreme court)";
-    case "TRIBUNAL_COURT":
-      return "(tribunal -income -tax)";
-    default:
+    case 'ITAT':
       return "(income tax appellate tribunal OR ITAT OR income-tax appellate tribunal OR income tax appellate court)";
+    case 'GST':
+      return "(GST OR goods and services tax OR goods service tax OR central excise OR customs)";
+    case 'INCOME_TAX':
+      return "(income tax -appellate -tribunal OR IT department OR income tax officer OR ITO)";
+    case 'HIGH_COURT':
+      return "(high court OR HC OR delhi high court OR mumbai high court OR calcutta high court)";
+    case 'SUPREME_COURT':
+      return "(supreme court OR SC OR apex court OR hon'ble supreme court)";
+    case 'TRIBUNAL_COURT':
+      return "(tribunal OR appellate tribunal OR CESTAT OR NCLAT OR NGT)";
+    default:
+      return "(income tax appellate tribunal OR ITAT OR GST OR supreme court OR high court)";
   }
 }
 
@@ -103,12 +103,33 @@ async function syncKanoonData(targetCategory?: string) {
       console.log('🌐 Syncing all categories with default query');
     }
     
-    // Fetch cases from page 1 only as requested
-    const cases: IKanoonResult[] = await fetchIndianKanoonDataWithRetry({ 
-      pagenum: 1,
-      formInput: searchQuery 
-    });
-    console.log(`📊 Fetched ${cases.length} cases from Indian Kanoon API (page 1)`);
+    // Fetch cases from pages 1 to 3 for comprehensive data
+    const allCases: IKanoonResult[] = [];
+    const pagesToFetch = [1, 2, 3];
+    
+    for (const pageNum of pagesToFetch) {
+      try {
+        console.log(`📄 Fetching page ${pageNum}...`);
+        const pageCases: IKanoonResult[] = await fetchIndianKanoonDataWithRetry({ 
+          pagenum: pageNum,
+          formInput: searchQuery 
+        });
+        
+        allCases.push(...pageCases);
+        console.log(`📊 Fetched ${pageCases.length} cases from page ${pageNum}`);
+        
+        // Add delay between page requests to respect API rate limits
+        if (pageNum < 3) {
+          await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
+        }
+      } catch (error) {
+        console.error(`❌ Error fetching page ${pageNum}:`, error);
+        // Continue with next page even if one fails
+      }
+    }
+    
+    const cases = allCases;
+    console.log(`📊 Total fetched ${cases.length} cases from pages 1-3`);
 
     let newCases = 0;
     let updatedCases = 0;
@@ -297,7 +318,7 @@ export function startKanoonSyncCron() {
     // Stagger the start times by 4 hours for each category to avoid API overload
     // ITAT: 2:00 AM, GST: 6:00 AM, INCOME_TAX: 10:00 AM, etc.
     const startHour = 2 + (index * 4);
-    const cronExpression = `0 ${startHour} */2 * *`; // Every 2 days at specific hour
+    const cronExpression = `0 ${startHour} * * *`; // Every days at specific hour
     
     console.log(`📅 Scheduling ${category} sync every 48 hours at ${startHour}:00`);
     
