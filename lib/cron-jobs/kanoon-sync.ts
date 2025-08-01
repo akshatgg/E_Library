@@ -318,7 +318,7 @@ export function startKanoonSyncCron() {
     // Stagger the start times by 4 hours for each category to avoid API overload
     // ITAT: 2:00 AM, GST: 6:00 AM, INCOME_TAX: 10:00 AM, etc.
     const startHour = 2 + (index * 4);
-    const cronExpression = `0 ${startHour} * * *`; // Every days at specific hour
+    const cronExpression = `0 ${startHour} * * 6`; // Every 7 days at specific hour
     
     console.log(`📅 Scheduling ${category} sync every 48 hours at ${startHour}:00`);
     
