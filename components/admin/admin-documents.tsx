@@ -33,8 +33,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { AdminDocumentForm } from "@/components/admin/admin-document-form"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Textarea } from "@/components/ui/textarea"
 
 interface Document {
   id: string
@@ -45,6 +45,163 @@ interface Document {
   documentType: string
   pdfUrl?: string
   status: "published" | "draft" | "archived"
+  description?: string
+}
+
+// Simple document form component since the original was commented out
+function AdminDocumentForm({ 
+  document, 
+  onSubmit, 
+  onCancel 
+}: { 
+  document?: Document | null
+  onSubmit: (doc: Document | Omit<Document, 'id'>) => void
+  onCancel: () => void
+}) {
+  const [formData, setFormData] = useState({
+    title: document?.title || '',
+    category: document?.category || '',
+    court: document?.court || '',
+    date: document?.date || new Date().toISOString().split('T')[0],
+    documentType: document?.documentType || 'Case Law',
+    pdfUrl: document?.pdfUrl || '',
+    status: document?.status || 'draft' as const,
+    description: document?.description || ''
+  })
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (document) {
+      onSubmit({ ...document, ...formData })
+    } else {
+      onSubmit(formData)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="title">Title</Label>
+          <Input
+            id="title"
+            value={formData.title}
+            onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+            required
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="category">Category</Label>
+          <Select
+            value={formData.category}
+            onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ITAT">ITAT</SelectItem>
+              <SelectItem value="GST">GST</SelectItem>
+              <SelectItem value="Income Tax">Income Tax</SelectItem>
+              <SelectItem value="High Court">High Court</SelectItem>
+              <SelectItem value="Supreme Court">Supreme Court</SelectItem>
+              <SelectItem value="Tribunal Court">Tribunal Court</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="court">Court</Label>
+          <Input
+            id="court"
+            value={formData.court}
+            onChange={(e) => setFormData(prev => ({ ...prev, court: e.target.value }))}
+            required
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="date">Date</Label>
+          <Input
+            id="date"
+            type="date"
+            value={formData.date}
+            onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
+            required
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="documentType">Document Type</Label>
+          <Select
+            value={formData.documentType}
+            onValueChange={(value) => setFormData(prev => ({ ...prev, documentType: value }))}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Case Law">Case Law</SelectItem>
+              <SelectItem value="Order">Order</SelectItem>
+              <SelectItem value="Judgment">Judgment</SelectItem>
+              <SelectItem value="Circular">Circular</SelectItem>
+              <SelectItem value="Notification">Notification</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="status">Status</Label>
+          <Select
+            value={formData.status}
+            onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as Document['status'] }))}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="published">Published</SelectItem>
+              <SelectItem value="draft">Draft</SelectItem>
+              <SelectItem value="archived">Archived</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      
+      <div className="space-y-2">
+        <Label htmlFor="pdfUrl">PDF URL</Label>
+        <Input
+          id="pdfUrl"
+          type="url"
+          value={formData.pdfUrl}
+          onChange={(e) => setFormData(prev => ({ ...prev, pdfUrl: e.target.value }))}
+          placeholder="https://example.com/document.pdf"
+        />
+      </div>
+      
+      <div className="space-y-2">
+        <Label htmlFor="description">Description</Label>
+        <Textarea
+          id="description"
+          value={formData.description}
+          onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+          placeholder="Brief description of the document..."
+          rows={3}
+        />
+      </div>
+      
+      <div className="flex justify-end gap-2 pt-4">
+        <Button type="button" variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="submit">
+          {document ? 'Update Document' : 'Add Document'}
+        </Button>
+      </div>
+    </form>
+  )
 }
 
 export function AdminDocuments() {
@@ -79,7 +236,7 @@ export function AdminDocuments() {
         const entries = JSON.parse(storedDocs)
         
         // Convert to our document format
-        const formattedDocs = entries.map((entry: any) => ({
+        const formattedDocs: Document[] = entries.map((entry: any) => ({
           id: entry.id,
           title: `${entry.appellant} vs ${entry.respondent}`,
           category: entry.category_id,
@@ -87,7 +244,8 @@ export function AdminDocuments() {
           date: entry.tribunal_order_date || entry.createdAt,
           documentType: entry.documentType || 'Case Law',
           pdfUrl: entry.pdfUrl || entry.download,
-          status: 'published',
+          status: 'published' as const,
+          description: entry.description || ''
         }))
         
         setDocuments(formattedDocs)
@@ -109,7 +267,7 @@ export function AdminDocuments() {
   
   const handleAddDocument = (document: Omit<Document, 'id'>) => {
     // Generate a new ID
-    const newDoc = {
+    const newDoc: Document = {
       ...document,
       id: Date.now().toString(),
     }
@@ -123,19 +281,21 @@ export function AdminDocuments() {
     })
   }
   
-  const handleEditDocument = (document: Document) => {
-    setDocuments(prev => 
-      prev.map(doc => 
-        doc.id === document.id ? document : doc
+  const handleEditDocument = (document: Document | Omit<Document, "id">) => {
+    if ('id' in document) {
+      setDocuments(prev => 
+        prev.map(doc => 
+          doc.id === document.id ? document as Document : doc
+        )
       )
-    )
     
-    setEditingDocument(null)
-    
-    toast({
-      title: 'Success',
-      description: 'Document updated successfully',
-    })
+      setEditingDocument(null)
+      
+      toast({
+        title: 'Success',
+        description: 'Document updated successfully',
+      })
+    }
   }
   
   const handleDeleteDocument = async () => {
@@ -189,8 +349,8 @@ export function AdminDocuments() {
       return matchesSearch && matchesCategory && matchesStatus
     })
     .sort((a, b) => {
-      const aVal = a[sortField]
-      const bVal = b[sortField]
+      const aVal = a[sortField] ?? ''
+      const bVal = b[sortField] ?? ''
       
       if (aVal < bVal) {
         return sortDirection === 'asc' ? -1 : 1
@@ -202,17 +362,17 @@ export function AdminDocuments() {
     })
   
   const categories = Array.from(new Set(documents.map(doc => doc.category)))
-  const statuses = ['published', 'draft', 'archived']
+  const statuses: Document['status'][] = ['published', 'draft', 'archived']
   
   return (
     <div className="space-y-6">
       {(showAddForm || editingDocument) ? (
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold">
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <CardTitle>
                 {editingDocument ? 'Edit Document' : 'Add New Document'}
-              </h2>
+              </CardTitle>
               <Button
                 variant="ghost"
                 size="icon"
@@ -224,7 +384,8 @@ export function AdminDocuments() {
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            
+          </CardHeader>
+          <CardContent>
             <AdminDocumentForm
               document={editingDocument}
               onSubmit={editingDocument ? handleEditDocument : handleAddDocument}
@@ -414,7 +575,7 @@ export function AdminDocuments() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => window.open(doc.pdfUrl, '_blank')}>
+                            <DropdownMenuItem onClick={() => doc.pdfUrl && window.open(doc.pdfUrl, '_blank')}>
                               <Eye className="mr-2 h-4 w-4" />
                               View
                             </DropdownMenuItem>
@@ -429,7 +590,10 @@ export function AdminDocuments() {
                               <Download className="mr-2 h-4 w-4" />
                               Download
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => confirmDelete(doc.id)} className="text-red-600">
+                            <DropdownMenuItem 
+                              onClick={() => confirmDelete(doc.id)} 
+                              className="text-red-600"
+                            >
                               <Trash2 className="mr-2 h-4 w-4" />
                               Delete
                             </DropdownMenuItem>
@@ -455,10 +619,12 @@ export function AdminDocuments() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction>
+            <AlertDialogAction onClick={handleDeleteDocument}>
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-\
+    </div>
+  )
+}

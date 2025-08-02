@@ -2,6 +2,9 @@ import { startKanoonSyncCron } from './kanoon-sync';
 
 export function initializeCronJobs() {
   // Only run cron jobs in production or when explicitly enabled
+  console.log('🔧 Initializing cron jobs...');
+  console.log('Current environment:', process.env.NODE_ENV);
+  console.log('Cron jobs enabled:', process.env.ENABLE_CRON_JOBS);
   if (process.env.NODE_ENV === 'production' || process.env.ENABLE_CRON_JOBS === 'true') {
     console.log('🔧 Initializing cron jobs...');
     startKanoonSyncCron();

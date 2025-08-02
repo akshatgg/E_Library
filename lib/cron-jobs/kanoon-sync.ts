@@ -99,14 +99,14 @@ async function syncKanoonData(targetCategory?: string) {
       console.log(`🔍 Using search query: ${searchQuery}`);
     } else {
       // Default search for all categories
-      searchQuery = "(income tax appellate tribunal OR ITAT OR income-tax appellate tribunal OR income tax appellate court)";
+      searchQuery = "(income tax appellate tribunal OR ITAT OR GST OR supreme court OR high court)";
       console.log('🌐 Syncing all categories with default query');
     }
     
-    // Fetch cases from pages 1 to 3 for comprehensive data
+    // Fetch cases from pages 1 to 5 for comprehensive data
     const allCases: IKanoonResult[] = [];
-    const pagesToFetch = [1, 2, 3];
-    
+    const pagesToFetch = [1,2,3,4,5,6,7,8,9,10]; // Fetching first 10 pages for better coverage
+
     for (const pageNum of pagesToFetch) {
       try {
         console.log(`📄 Fetching page ${pageNum}...`);
@@ -310,31 +310,45 @@ async function logSyncStats(summary: any) {
 // Schedule cron jobs for each category to run every 48 hours
 export function startKanoonSyncCron() {
   console.log('🚀 Starting Kanoon sync cron jobs...');
-  console.log('⏰ Each category scheduled to run every 48 hours');
-  
-  const categories = ["ITAT", "GST", "INCOME_TAX", "HIGH_COURT", "SUPREME_COURT", "TRIBUNAL_COURT"];
-  
-  categories.forEach((category, index) => {
-    // Stagger the start times by 4 hours for each category to avoid API overload
-    // ITAT: 2:00 AM, GST: 6:00 AM, INCOME_TAX: 10:00 AM, etc.
-    const startHour = 2 + (index * 4);
-    const cronExpression = `0 ${startHour} * * 6`; // Every 7 days at specific hour
-    
-    console.log(`📅 Scheduling ${category} sync every 48 hours at ${startHour}:00`);
-    
+  console.log('📅 Scheduling syncs every Saturday starting at 2:47 AM IST with 5 min gap (UTC equivalent)...');
+
+const categories = [
+  { name: "ALL", minute: 45, hour: 7 },           // 1:15 PM IST
+  { name: "ITAT", minute: 50, hour: 7 },          // 1:20 PM IST
+  { name: "GST", minute: 55, hour: 7 },           // 1:25 PM IST
+  { name: "INCOME_TAX", minute: 0, hour: 8 },     // 1:30 PM IST
+  { name: "HIGH_COURT", minute: 5, hour: 8 },     // 1:35 PM IST
+  { name: "SUPREME_COURT", minute: 10, hour: 8 }, // 1:40 PM IST
+  { name: "TRIBUNAL_COURT", minute: 15, hour: 8 } // 1:45 PM IST
+];
+
+
+
+
+
+  categories.forEach(({ name, minute, hour }, index) => {
+    const cronExpression = `${minute} ${hour} * * 6`; // 5 = Friday UTC
+
+    console.log(`📅 Scheduling ${name} at UTC ${hour}:${minute.toString().padStart(2, '0')} (IST ~${2 + Math.floor((47 + index * 5) / 60)}:${(47 + index * 5) % 60})`);
+
     cron.schedule(cronExpression, async () => {
-      console.log(`⏰ ${category} sync cron job triggered at:`, new Date().toISOString());
+      console.log(`⏰ ${name} cron triggered at: ${new Date().toISOString()}`);
       try {
-        await syncKanoonData(category);
-        console.log(`✅ Scheduled ${category} sync completed successfully`);
+        await syncKanoonData(name === "ALL" ? undefined : name);
+        console.log(`✅ ${name} sync completed`);
       } catch (error) {
-        console.error(`❌ Scheduled ${category} sync failed:`, error);
+        console.error(`❌ ${name} sync failed:`, error);
       }
     });
   });
 
   console.log('✅ All category cron jobs scheduled successfully');
 }
+
+
+
+
+
 
 // Manual sync function for testing
 export async function runManualSync(category?: string) {

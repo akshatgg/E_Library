@@ -1,4 +1,4 @@
-import { ADRSuggestions } from "@/components/ui/adr/adr-suggestions"
+// import { ADRSuggestions } from "@/components/ui/adr/adr-suggestions"
 
 export default function ADRPage() {
   return (
@@ -10,7 +10,7 @@ export default function ADRPage() {
         </p>
       </div>
 
-      <ADRSuggestions />
+      {/* <ADRSuggestions /> */}
     </div>
   )
 }
