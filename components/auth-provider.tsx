@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { setCookies, removeCookies, getCookie } from "cookies-next";
 import {
   signInWithEmailAndPassword,
@@ -89,26 +89,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Check for manual token deletion
-  const checkTokenIntegrity = () => {
-    const cookie = getCookie('token');
-    const storedExpiry = localStorage.getItem('tokenExpiry');
-    
-    // If cookie was manually deleted but we still have user state
-    if (!cookie && user && storedExpiry) {
-      console.log('Token manually deleted, signing out...');
-      handleSignOut();
-      return false;
-    }
-    
-    // If token expired
-    if (storedExpiry && Date.now() > parseInt(storedExpiry)) {
-      console.log('Token expired, signing out...');
-      handleSignOut();
-      return false;
-    }
-    
-    return true;
-  };
+ // Move checkTokenIntegrity outside useEffect and update it
+const checkTokenIntegrity = useCallback(() => {
+  const cookie = getCookie('token');
+  const storedExpiry = localStorage.getItem('tokenExpiry');
+  
+  // If cookie was manually deleted but we still have user state
+  if (!cookie && user && storedExpiry) {
+    console.log('Token manually deleted, signing out...');
+    handleSignOut();
+    return false;
+  }
+  
+  // If token expired
+  if (storedExpiry && Date.now() > parseInt(storedExpiry)) {
+    console.log('Token expired, signing out...');
+    handleSignOut();
+    return false;
+  }
+  
+  return true;
+}, [user]); // Only depend on user for this function
 
   // Clean sign out
   const handleSignOut = async () => {
@@ -258,7 +259,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       unsubscribe();
       clearInterval(tokenCheckInterval);
     };
-  }, [user]); // Add user as dependency to handle manual deletions
+  }, []); // Add user as dependency to handle manual deletions
 
   const signIn = async (email: string, password: string) => {
     setError(null);
