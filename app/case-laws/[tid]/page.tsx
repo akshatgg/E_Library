@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, use } from "react";
-import { ArrowLeft, Loader, Loader2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, Loader, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { getCaseDetail } from "../actions";
@@ -32,6 +32,7 @@ export default function CasePage({ params }: { params: { tid: string } }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
+  const [showFullJudgment, setShowFullJudgment] = useState(false);
   const router = useRouter();
   const stripHtmlTags = (html: string) => {
     // Special handling for legal document structure
@@ -316,10 +317,15 @@ export default function CasePage({ params }: { params: { tid: string } }) {
 
   if (loading) {
     return (
-      <>
-        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-        Processing...
-      </>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="flex flex-col items-center">
+            <Loader2 className="h-12 w-12 animate-spin text-blue-600 mb-4" />
+            <h2 className="text-xl font-medium text-gray-700">Loading Case Details</h2>
+            <p className="text-gray-500 mt-2">Please wait while we retrieve the case information...</p>
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -345,6 +351,17 @@ export default function CasePage({ params }: { params: { tid: string } }) {
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="mb-4">
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => router.back()}
+              className="flex items-center text-gray-600 hover:text-gray-900"
+            >
+              <ArrowLeft className="mr-1 h-4 w-4" />
+              Back to Results
+            </Button>
+          </div>
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <h1 className="text-2xl font-bold text-gray-900 mb-2">
@@ -634,17 +651,49 @@ export default function CasePage({ params }: { params: { tid: string } }) {
                   </div>
                 </div>
               </div>
-              <div
-                className="prose prose-headings:font-semibold prose-headings:text-gray-800 
-                           prose-p:text-justify prose-p:my-4 max-w-none text-sm leading-relaxed 
-                           border-t border-gray-200 pt-6"
-                dangerouslySetInnerHTML={{ __html: cleanedContent }}
-                style={{
-                  fontFamily: "Georgia, serif",
-                  lineHeight: "1.8",
-                  color: "#333",
-                }}
-              />
+              <div className="border-t border-gray-200 pt-6">
+                <div 
+                  className="prose prose-headings:font-semibold prose-headings:text-gray-800 
+                             prose-p:text-justify prose-p:my-4 max-w-none text-sm leading-relaxed"
+                  style={{
+                    fontFamily: "Georgia, serif",
+                    lineHeight: "1.8",
+                    color: "#333",
+                    maxHeight: showFullJudgment ? "none" : "500px",
+                    overflow: "hidden",
+                    position: "relative"
+                  }}
+                >
+                  <div dangerouslySetInnerHTML={{ __html: cleanedContent }} />
+                  {!showFullJudgment && (
+                    <div 
+                      className="absolute bottom-0 left-0 right-0 h-24" 
+                      style={{ 
+                        background: "linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,1) 100%)" 
+                      }}
+                    />
+                  )}
+                </div>
+                <div className="mt-4 text-center">
+                  <Button 
+                    variant="outline"
+                    onClick={() => setShowFullJudgment(!showFullJudgment)} 
+                    className="mx-auto flex items-center gap-2"
+                  >
+                    {showFullJudgment ? (
+                      <>
+                        <ChevronUp className="h-4 w-4" />
+                        Show Less
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="h-4 w-4" />
+                        Show Full Judgment
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         )}
