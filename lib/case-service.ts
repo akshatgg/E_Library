@@ -20,6 +20,9 @@ export function mapDocSourceToCategory(docsource: string): string {
   if (source.includes('supreme court')) {
     return 'SUPREME_COURT'
   }
+  if (source.includes('tribunal') || source.includes('appellate authority')) {
+    return 'TRIBUNAL_COURT'
+  }
   
   return 'OTHER'
 }
@@ -71,6 +74,8 @@ export async function storeCaseLaws(
           relevantSections: [],
           keywords: [],
           legalPoints: [],
+          docsource: item.docsource || 'Unknown',
+          publishdate: item.publishdate || ''
         }
         
         if (existingCase) {
@@ -187,11 +192,13 @@ export async function getCaseLaws(options: {
   const where: any = {}
   
   if (category && category !== 'all' && category !== 'OTHER') {
+    // Convert string category to enum
     where.category = category
   }
   
   if (year && year !== 'all') {
-    where.date = {
+    // Use publishdate instead of date for filtering by year
+    where.publishdate = {
       contains: year
     }
   }
@@ -199,8 +206,8 @@ export async function getCaseLaws(options: {
   if (searchQuery) {
     where.OR = [
       { title: { contains: searchQuery, mode: 'insensitive' } },
-      { summary: { contains: searchQuery, mode: 'insensitive' } },
-      { court: { contains: searchQuery, mode: 'insensitive' } },
+      { headline: { contains: searchQuery, mode: 'insensitive' } }, // Use headline instead of summary
+      { docsource: { contains: searchQuery, mode: 'insensitive' } }, // Use docsource instead of court
     ]
   }
   
@@ -211,7 +218,8 @@ export async function getCaseLaws(options: {
       skip,
       take: limit,
       orderBy: {
-        [sortBy]: sortOrder
+        // Use appropriate field names for sorting
+        [sortBy === 'date' ? 'publishdate' : sortBy]: sortOrder
       },
       include: {
         caseDetail: {
@@ -324,7 +332,9 @@ export async function getCaseStatistics() {
   const total = await prisma.caseLaw.count()
   
   const categoryCounts = stats.reduce((acc, stat) => {
-    acc[stat.category] = stat._count.category
+    if (stat.category !== null) {
+      acc[stat.category.toString()] = stat._count.category
+    }
     return acc
   }, {} as Record<string, number>)
   

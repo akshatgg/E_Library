@@ -1,5 +1,5 @@
 "use client";
-
+import { Prisma } from "@prisma/client";
 import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import CaseTablePDF from "../pdf/CaseTablePDF";
 import { pdf } from "@react-pdf/renderer";
+import { useRouter } from "next/navigation";
+import { toast } from "@/hooks/use-toast";
 
 import {
   Select,
@@ -34,9 +36,6 @@ import {
   ChevronRight,
   Link,
 } from "lucide-react";
-import { toast } from "sonner";
-
-import { useRouter } from "next/navigation";
 
 export interface CaseData {
   id: string;
@@ -44,7 +43,7 @@ export interface CaseData {
   court: string;
   bench: string;
   date: string;
-  category: "ITAT" | "GST" | "INCOME_TAX" | "HIGH_COURT" | "SUPREME_COURT";
+  category: "ITAT" | "GST" | "INCOME_TAX" | "HIGH_COURT" | "SUPREME_COURT" | "TRIBUNAL_COURT";
   outcome: "allowed" | "dismissed" | "partly_allowed";
   parties: {
     appellant: string;
@@ -101,6 +100,7 @@ export function CaseLawsDashboard() {
   const [totalPages, setTotalPages] = useState(1); // will increase dynamically
   const [lastPageReached, setLastPageReached] = useState(false);
   const [expandedRows, setExpandedRows] = useState(new Set());
+  const [activeTab, setActiveTab] = useState("search"); // Track active tab
 
   const router = useRouter();
 
@@ -245,6 +245,16 @@ export function CaseLawsDashboard() {
   };
 
   const getFormInputByCategory = (category: string): string => {
+    // When selecting "all" category, just use an empty string to get all results
+    // or use a very broad search query that will match most legal documents
+    if (category === "all") {
+      if (selectedYear === "all") {
+        return ""; // Empty query to get all results
+      } else {
+        return `year:${selectedYear}`; // Just filter by year
+      }
+    }
+    
     if (selectedYear == "all") {
       switch (category) {
         case "ITAT":
@@ -257,9 +267,8 @@ export function CaseLawsDashboard() {
           return "(high court order)";
         case "SUPREME_COURT":
           return "(supreme court order)";
-        case "TRIBUNAL":
+        case "TRIBUNAL_COURT":
           return "(tribunal)";
-        case "all":
         default:
           return "(gst OR income tax OR ITAT)";   
       }
@@ -275,23 +284,35 @@ export function CaseLawsDashboard() {
           return `(high court order) AND year:${selectedYear}`;
         case "SUPREME_COURT":
           return `(supreme court order) AND year:${selectedYear}`;
-        case "TRIBUNAL":
+        case "TRIBUNAL_COURT":
           return `(tribunal OR appellate authority) AND year:${selectedYear}`;
-        case "all":
         default:
-          return "(gst OR income tax OR income tax appellate tribunal )";
+          return `year:${selectedYear}`;
       }
     }
   };
 
-  const mapDocSourceToCategory = (docsource: string) => {
+  // Helper function to categorize court source
+  const categorizeSource = (docsource: string): string => {
     const source = docsource?.toLowerCase() || "";
-    if (source.includes("itat")) return "ITAT";
-    if (source.includes("gst") || source.includes("cestat")) return "GST";
-    if (source.includes("income tax") || source.includes("income-tax"))
+    if (source.includes("itat") || source.includes("income tax appellate tribunal")) {
+      return "ITAT";
+    }
+    if (source.includes("gst") || source.includes("goods and services tax") || source.includes("cestat")) {
+      return "GST";
+    }
+    if (source.includes("income tax") || source.includes("income-tax")) {
       return "INCOME_TAX";
-    if (source.includes("high court")) return "HIGH_COURT";
-    if (source.includes("supreme court")) return "SUPREME_COURT";
+    }
+    if (source.includes("high court")) {
+      return "HIGH_COURT";
+    }
+    if (source.includes("supreme court")) {
+      return "SUPREME_COURT";
+    }
+    if (source.includes("tribunal") || source.includes("appellate authority")) {
+      return "TRIBUNAL_COURT";
+    }
     return "OTHER";
   };
 
@@ -306,51 +327,72 @@ export function CaseLawsDashboard() {
         setStatsLoading(false);
         return;
       }
-      const categories = [
-        "ITAT",
-        "GST",
-        "INCOME_TAX",
-        "HIGH_COURT",
-        "SUPREME_COURT",
-      ];
-      const counts: Record<string, number> = {};
-      let total = 0;
-
-      for (const cat of categories) {
-        const formInput = encodeURIComponent(getFormInputByCategory(cat));
-        let url = `/api/cases/total-pages?formInput=${formInput}`;
-        if (selectedYear !== "all") {
-          url += `&year=${selectedYear}`;
+      
+      try {
+        // Use the statistics API endpoint
+        const res = await fetch('/api/cases/statistics');
+        const data = await res.json();
+        
+        if (!data.success) {
+          throw new Error('Failed to fetch statistics');
         }
-
-        try {
-          const res = await fetch(url);
-          const json = await res.json();
-          console.log(`fetched data for ${cat}: ${json.data} pages`);
-
-          if (json.success) {
-            counts[cat] = json.data;
-            total += json.data;
-          } else {
-            counts[cat] = 0;
-          }
-        } catch (err) {
-          console.error(`Failed for ${cat}`, err);
-          counts[cat] = 0;
+        
+        const { categoryCounts: counts, total } = data.data;
+        
+        console.log("Fetched category counts from database:", counts);
+        
+        // Ensure all expected categories are present
+        const categories = [
+          "ITAT",
+          "GST",
+          "INCOME_TAX",
+          "HIGH_COURT",
+          "SUPREME_COURT",
+        ];
+        
+        // Ensure all categories have at least 0 as count
+        const formattedCounts: Record<string, number> = {};
+        for (const cat of categories) {
+          formattedCounts[cat] = counts[cat] || 0;
         }
+        
+        // Cache the results
+        setCachedCategoryCounts(selectedYear, formattedCounts, total);
+
+        setCategoryCounts(formattedCounts);
+        setOverallTotal(total);
+      } catch (error) {
+        console.error("Error fetching category counts:", error);
+        
+        // Set empty counts in case of error
+        const emptyCounts: Record<string, number> = {
+          "ITAT": 0,
+          "GST": 0, 
+          "INCOME_TAX": 0,
+          "HIGH_COURT": 0,
+          "SUPREME_COURT": 0
+        };
+        
+        setCategoryCounts(emptyCounts);
+        setOverallTotal(0);
+        
+        toast({
+          title: "Error",
+          description: "Failed to load case statistics",
+          variant: "destructive"
+        });
+      } finally {
+        setStatsLoading(false);
       }
-      // Cache the results
-      setCachedCategoryCounts(selectedYear, counts, total);
-
-      setCategoryCounts(counts);
-      setOverallTotal(total);
-      setStatsLoading(false);
     };
 
     fetchAllCategoryCounts();
   }, []);
 
+  // Separate useEffect that only runs when the page changes, not when filters change
   useEffect(() => {
+    // Skip loading data when page changes if we're also changing filters
+    // The filter change effect will handle data loading
     const loadData = async () => {
       try {
         // Check cache first
@@ -365,41 +407,48 @@ export function CaseLawsDashboard() {
           return;
         }
         setLoading(true);
-        const formInput = encodeURIComponent(
-          getFormInputByCategory(selectedCategory)
-        );
 
-        // Build the API URL dynamically based on year selection
-        let apiUrl = `${
-          process.env.NEXT_PUBLIC_API_URL
-        }/api/case-laws?pagenum=${currentPage - 1}&formInput=${formInput}`;
+        // Build query parameters for API call
+        const queryParams = new URLSearchParams({
+          page: currentPage.toString(),
+          limit: '20',
+          sortBy: 'date',
+          sortOrder: 'desc'
+        });
 
-        // Only add year parameter if a specific year is selected (not "all")
-        if (selectedYear !== "all") {
-          apiUrl += `&year=${selectedYear}`;
+        // Add optional parameters
+        if (selectedCategory && selectedCategory !== 'all') {
+          queryParams.append('category', selectedCategory);
         }
 
-        const res = await fetch(apiUrl);
+        if (selectedYear && selectedYear !== 'all') {
+          queryParams.append('year', selectedYear);
+        }
+        
+        // Fetch data from our API endpoint
+        const response = await fetch(`/api/case-laws?${queryParams.toString()}`);
+        const data = await response.json();
+        
+        console.log("Fetched data from API", data);
 
-        const json = await res.json();
-        console.log("Fetched data from API", json);
-
-        if (!json.success || !Array.isArray(json.data)) {
-          console.error("Invalid API response format", json);
+        if (!data.success || !Array.isArray(data.data)) {
+          console.error("Invalid API response format", data);
           setLoading(false);
           return;
         }
-        const mappedCases = json.data.map((item: any, idx: number) => {
+
+        // Map API results to our CaseData format
+        const mappedCases = data.data.map((item: any) => {
           const cleanHeadline = item.headline?.replace(/<[^>]+>/g, "") ?? "";
           const cleanTitle = item.title?.replace(/<[^>]+>/g, "") ?? "";
           return {
-            id: item.tid?.toString() ?? String(idx),
+            id: item.id || item.tid?.toString(),
             title: cleanTitle,
             court: item.docsource ?? "Unknown",
             date: item.publishdate ?? "",
             bench: item.bench ?? "",
-            category: mapDocSourceToCategory(item.docsource ?? ""),
-            outcome: "allowed",
+            category: (item.category ? item.category.toString() : categorizeSource(item.docsource ?? "")) as "ITAT" | "GST" | "INCOME_TAX" | "HIGH_COURT" | "SUPREME_COURT" | "TRIBUNAL_COURT",
+            outcome: "allowed" as "allowed", // Type assertion for the union type
             parties: {
               appellant: "",
               respondent: "",
@@ -417,9 +466,22 @@ export function CaseLawsDashboard() {
         setCachedData(currentPage, selectedCategory, selectedYear, mappedCases);
 
         setCases(mappedCases);
-        setTotalPages(10);
+        setFilteredCases(mappedCases);
+        
+        // Calculate total pages based on total count and limit per page
+        const calculatedTotalPages = Math.ceil(data.total / 20);
+        setTotalPages(calculatedTotalPages || 1);
+        
+        // Update lastPageReached flag
+        setLastPageReached(currentPage >= calculatedTotalPages);
+        
       } catch (error) {
         console.error("Error fetching data:", error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch case data",
+          variant: "destructive"
+        });
       } finally {
         setLoading(false);
       }
@@ -428,10 +490,13 @@ export function CaseLawsDashboard() {
     loadData();
   }, [currentPage, selectedCategory, selectedYear]);
 
-  // Clear cache when category or year changes
+  // This effect has been replaced with direct handlers in the Select components
+  // to ensure immediate UI updates
+  
+  // Update lastPageReached state whenever currentPage or totalPages changes
   useEffect(() => {
-    setCurrentPage(1); // Reset to first page when filters change
-  }, [selectedCategory, selectedYear]);
+    setLastPageReached(currentPage >= totalPages);
+  }, [currentPage, totalPages]);
   // Add cache management functions for potential future use
   // const getCacheStats = () => {
   //   const cacheSize = cacheRef.current.size;
@@ -472,7 +537,15 @@ export function CaseLawsDashboard() {
   };
 
   const handleNextPage = () => {
-    setCurrentPage((prev) => prev + 1);
+    if (currentPage < totalPages) {
+      setCurrentPage((prev) => prev + 1);
+    }
+  };
+  
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
   };
   useEffect(() => {
     filterCases();
@@ -540,30 +613,37 @@ export function CaseLawsDashboard() {
   const searchCases = async (query: string) => {
     setLoading(true);
     try {
-      const encodedQuery = encodeURIComponent(query.trim());
+      // Build query parameters for API call
+      const queryParams = new URLSearchParams({
+        page: '1',
+        limit: '20',
+        query: query.trim(),
+        sortBy: 'date',
+        sortOrder: 'desc'
+      });
+      
+      // Fetch data from our API endpoint
+      const response = await fetch(`/api/case-laws?${queryParams.toString()}`);
+      const data = await response.json();
 
-      const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/case-laws?pagenum=0&formInput=${encodedQuery}`;
-      console.log(`api url: ${apiUrl}`);
-
-      const res = await fetch(apiUrl);
-      const json = await res.json();
-
-      if (!json.success || !Array.isArray(json.data)) {
-        toast.error("No data found or API failed.");
+      if (!data.success || !Array.isArray(data.data) || data.data.length === 0) {
+      
+        setLoading(false);
         return;
       }
 
-      const mappedCases = json.data.map((item: any, idx: number) => {
+      // Map API results to our CaseData format
+      const mappedCases = data.data.map((item: any) => {
         const cleanHeadline = item.headline?.replace(/<[^>]+>/g, "") ?? "";
         const cleanTitle = item.title?.replace(/<[^>]+>/g, "") ?? "";
         return {
-          id: item.tid?.toString() ?? String(idx),
+          id: item.id || item.tid?.toString(),
           title: cleanTitle,
           court: item.docsource ?? "Unknown",
           date: item.publishdate ?? "",
           bench: item.bench ?? "",
-          category: mapDocSourceToCategory(item.docsource ?? ""),
-          outcome: "allowed",
+          category: (item.category ? item.category.toString() : categorizeSource(item.docsource ?? "")) as "ITAT" | "GST" | "INCOME_TAX" | "HIGH_COURT" | "SUPREME_COURT" | "TRIBUNAL_COURT",
+          outcome: "allowed" as "allowed",
           parties: {
             appellant: "",
             respondent: "",
@@ -579,11 +659,33 @@ export function CaseLawsDashboard() {
 
       setCases(mappedCases); // Update cases for filtering and UI
       setFilteredCases(mappedCases); // Optional: If filtering manually too
-      setCurrentPage(1); // Reset page
-      toast.success(`Found ${mappedCases.length} case(s).`);
+      
+      // Reset to first page when performing a search
+      setCurrentPage(1); 
+      
+      // Calculate total pages based on total count and limit per page
+      const calculatedTotalPages = Math.ceil(data.total / 20);
+      setTotalPages(calculatedTotalPages || 1);
+      
+      // Set lastPageReached flag (useful for disabling the "Next" button)
+      // Since we're on page 1, we need to check if 1 >= totalPages
+      setLastPageReached(1 >= calculatedTotalPages);
+      
+      // Show success toast with found count when explicitly searching (not when changing filters)
+      if (query.trim() !== "" && !query.includes("year:") && !query.includes("(")) {
+        toast({
+          title: "Success", 
+          description: `Found ${data.total} case(s).`
+        });
+      }
+   
     } catch (error) {
       console.error("Search error:", error);
-      toast.error("Error during search. Please try again.");
+      toast({
+        title: "Error",
+        description: "Error during search. Please try again.",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
@@ -618,7 +720,8 @@ export function CaseLawsDashboard() {
     categoryCounts["GST"] +
     categoryCounts["INCOME_TAX"] +
     categoryCounts["HIGH_COURT"] +
-    categoryCounts["SUPREME_COURT"];
+    categoryCounts["SUPREME_COURT"] +
+    (categoryCounts["TRIBUNAL_COURT"] ?? 0);
   const stats = [
     {
       label: "Total Cases",
@@ -639,6 +742,7 @@ export function CaseLawsDashboard() {
       icon: TrendingUp,
       color: "text-purple-600",
     },
+
     {
       label: "This Month",
       value: cases.filter(
@@ -673,14 +777,48 @@ export function CaseLawsDashboard() {
   }, []);
 
   const handleDownloadPDF = async () => {
-    const blob = await pdf(<CaseTablePDF cases={filteredCases} />).toBlob();
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "case_table.pdf";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      // Set loading state for better UX
+      setLoading(true);
+      
+      // Generate a professional filename with date
+      const today = new Date();
+      const dateStr = today.toISOString().split('T')[0]; // YYYY-MM-DD format
+      const categoryStr = selectedCategory !== 'all' ? `-${selectedCategory}` : '';
+      const yearStr = selectedYear !== 'all' ? `-${selectedYear}` : '';
+      const filename = `Legal_Cases${categoryStr}${yearStr}_${dateStr}.pdf`;
+      
+      // Generate PDF
+      const blob = await pdf(<CaseTablePDF cases={filteredCases} />).toBlob();
+      const url = URL.createObjectURL(blob);
+      
+      // Create and trigger download link
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up URL object
+      URL.revokeObjectURL(url);
+      
+      // Show success message
+      toast({
+        title: "PDF Generated Successfully",
+        description: `${filteredCases.length} cases exported to ${filename}`,
+        variant: "default"
+      });
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast({
+        title: "PDF Generation Failed",
+        description: "There was a problem creating your PDF. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -736,7 +874,7 @@ export function CaseLawsDashboard() {
           ))}
         </div>
 
-        <Tabs defaultValue="search" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="search">Search Cases</TabsTrigger>
             <TabsTrigger value="browse">Browse by Category</TabsTrigger>
@@ -775,7 +913,27 @@ export function CaseLawsDashboard() {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <Select
                       value={selectedCategory}
-                      onValueChange={setSelectedCategory}
+                      onValueChange={(value) => {
+                        // Show loading indicator
+                        setLoading(true);
+                        
+                        // First clear the cache to ensure we get fresh data
+                        clearCache();
+                        
+                        // Reset pagination and current page
+                        setCurrentPage(1);
+                        setTotalPages(1); // Reset total pages to ensure UI updates immediately
+                        
+                        // Update the selected category
+                        setSelectedCategory(value);
+                        
+                        // Use setTimeout to ensure state updates are processed before fetching data
+                        setTimeout(() => {
+                          // Trigger a search with the new category to update results
+                          const formInput = getFormInputByCategory(value);
+                          searchCases(formInput);
+                        }, 10);
+                      }}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Category" />
@@ -789,7 +947,7 @@ export function CaseLawsDashboard() {
                         <SelectItem value="SUPREME_COURT">
                           Supreme Court
                         </SelectItem>
-                        <SelectItem value="TRIBUNAL">Tribunal</SelectItem>
+                        <SelectItem value="TRIBUNAL_COURT">Tribunal</SelectItem>
                       </SelectContent>
                     </Select>
 
@@ -827,7 +985,27 @@ export function CaseLawsDashboard() {
 
                     <Select
                       value={selectedYear}
-                      onValueChange={setSelectedYear}
+                      onValueChange={(value) => {
+                        // Show loading indicator
+                        setLoading(true);
+                        
+                        // First clear the cache to ensure we get fresh data
+                        clearCache();
+                        
+                        // Reset pagination and current page
+                        setCurrentPage(1);
+                        setTotalPages(1); // Reset total pages to ensure UI updates immediately
+                        
+                        // Update the selected year
+                        setSelectedYear(value);
+                        
+                        // Use setTimeout to ensure state updates are processed before fetching data
+                        setTimeout(() => {
+                          // Trigger a search with the new year to update results
+                          const formInput = getFormInputByCategory(selectedCategory);
+                          searchCases(formInput);
+                        }, 10);
+                      }}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Year" />
@@ -848,19 +1026,39 @@ export function CaseLawsDashboard() {
                     <Button
                       variant="outline"
                       onClick={() => {
+                        // Show loading indicator
+                        setLoading(true);
+                        
+                        // Clear all search filters
                         setSearchQuery("");
                         setSelectedCategory("all");
                         setSelectedCourt("all");
                         setSelectedOutcome("all");
                         setSelectedYear("all");
                         setSelectedSection("all");
+                        
+                        // Reset pagination
+                        setCurrentPage(1);
+                        
+                        // Clear cache
+                        clearCache();
+                        
+                        // Reload data with default settings using a delay to ensure state changes are processed
+                        setTimeout(() => {
+                          searchCases(""); // Empty search to get default results
+                        }, 10);
                       }}
                     >
                       <Filter className="h-4 w-4 mr-2" />
                       Clear
                     </Button>
-                    <Button onClick={handleDownloadPDF} className="mb-4">
-                      <Download className="h-4 w-4 mr-2" /> Download PDF
+                    <Button 
+                      onClick={handleDownloadPDF} 
+                      className="mb-4"
+                      disabled={loading || filteredCases.length === 0}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      {loading ? "Generating..." : "Download PDF"}
                     </Button>
                   </div>
                 </div>
@@ -1177,8 +1375,20 @@ export function CaseLawsDashboard() {
                             variant="outline"
                             className="w-full"
                             onClick={() => {
+                              // Set the selected category
                               setSelectedCategory(category);
-                              // Switch to search tab if needed
+                              
+                              // Switch to search tab
+                              setActiveTab("search");
+                              
+                              // Reset search query and other filters for clean search
+                              setSearchQuery("");
+                              setCurrentPage(1);
+                              
+                              // Optionally trigger a search with this category
+                              // This will help populate results immediately
+                              const formInput = getFormInputByCategory(category);
+                              searchCases(formInput);
                             }}
                           >
                             Browse Cases
@@ -1310,28 +1520,94 @@ export function CaseLawsDashboard() {
         </Tabs>
       </main>
 
-      <div className="flex justify-between items-center mt-4">
+      <div className="flex justify-between items-center mt-4 mb-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         <span className="text-sm text-gray-600">
-          Showing page {currentPage}
+          Showing page {currentPage} of {totalPages}
         </span>
 
-        <nav className="inline-flex space-x-2">
+        <nav className="inline-flex items-center space-x-1">
+          {/* Previous Button */}
           <button
             onClick={handlePreviousPage}
-            className="px-3 py-1 border rounded disabled:opacity-50"
+            className="px-3 py-1 border rounded disabled:opacity-50 hover:bg-gray-100"
             disabled={currentPage === 1}
           >
             Previous
           </button>
-
-          <span className="px-4 py-1 border rounded font-semibold text-blue-700 bg-gray-100">
-            {currentPage}
-          </span>
-
+          
+          {/* First Page */}
+          {currentPage > 3 && (
+            <>
+              <button
+                onClick={() => handlePageChange(1)}
+                className="px-3 py-1 border rounded hover:bg-gray-100"
+              >
+                1
+              </button>
+              
+              {/* Ellipsis if needed */}
+              {currentPage > 4 && (
+                <span className="px-2">...</span>
+              )}
+            </>
+          )}
+          
+          {/* Page Numbers */}
+          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+            // Calculate the page numbers to show
+            let pageNum;
+            if (currentPage <= 3) {
+              // If near start, show first 5 pages
+              pageNum = i + 1;
+            } else if (currentPage >= totalPages - 2) {
+              // If near end, show last 5 pages
+              pageNum = totalPages - 4 + i;
+            } else {
+              // Otherwise show 2 before and 2 after current
+              pageNum = currentPage - 2 + i;
+            }
+            
+            // Only render if the page is valid
+            if (pageNum > 0 && pageNum <= totalPages) {
+              return (
+                <button
+                  key={pageNum}
+                  onClick={() => handlePageChange(pageNum)}
+                  className={`px-3 py-1 border rounded ${
+                    pageNum === currentPage 
+                      ? "bg-blue-700 text-white font-semibold" 
+                      : "hover:bg-gray-100"
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              );
+            }
+            return null;
+          })}
+          
+          {/* Ellipsis and Last Page */}
+          {currentPage < totalPages - 2 && (
+            <>
+              {currentPage < totalPages - 3 && (
+                <span className="px-2">...</span>
+              )}
+              <button
+                onClick={() => handlePageChange(totalPages)}
+                className="px-3 py-1 border rounded hover:bg-gray-100"
+              >
+                {totalPages}
+              </button>
+            </>
+          )}
+          
+          {/* Next Button */}
           <button
             onClick={handleNextPage}
-            className="px-3 py-1 border rounded disabled:opacity-50"
-            disabled={lastPageReached}
+            className={`px-3 py-1 border rounded hover:bg-gray-100 ${
+              currentPage >= totalPages ? "opacity-50 cursor-not-allowed" : ""
+            }`}
+            disabled={currentPage >= totalPages}
           >
             Next
           </button>
