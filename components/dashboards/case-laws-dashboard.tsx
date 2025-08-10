@@ -1,6 +1,6 @@
 "use client";
-import { Prisma } from "@prisma/client";
-import { useState, useEffect, useRef } from "react";
+
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,6 +56,7 @@ export interface CaseData {
   legalPoints: string[];
   url: string;
   pdfUrl?: string;
+  taxSection?: string;
 }
 
 // Cache interface
@@ -548,41 +549,33 @@ export function CaseLawsDashboard() {
     }
   };
   useEffect(() => {
-    filterCases();
+    // Only run client-side filtering for specific filters that don't trigger a server request
+    if (cases.length > 0) {
+      filterCases();
+    }
   }, [
-    // searchQuery,
-    selectedCategory,
+    // We now handle these server-side, so they don't need to trigger client-side filtering
+    // selectedCategory, 
+    // selectedYear,
+    // selectedSection,
+    
+    // Keep these for client-side filtering
     selectedCourt,
     selectedOutcome,
-    selectedYear,
-    selectedSection,
     cases,
   ]);
 
   const filterCases = () => {
+    // Skip expensive filtering if no client-side filters are active
+    if (selectedCourt === "all" && selectedOutcome === "all") {
+      setFilteredCases(cases);
+      return;
+    }
+    
     let filtered = [...cases];
 
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (caseItem) =>
-          caseItem.title.toLowerCase().includes(query) ||
-          caseItem.summary.toLowerCase().includes(query) ||
-          caseItem.keywords.some((keyword) =>
-            keyword.toLowerCase().includes(query)
-          ) ||
-          caseItem.relevantSections.some((section) =>
-            section.toLowerCase().includes(query)
-          )
-      );
-    }
-
-    // if (selectedCategory !== "all") {
-    //   filtered = filtered.filter(
-    //     (caseItem) => caseItem.category === selectedCategory
-    //   );
-    // }
-
+    // Search query is now handled server-side through the searchCases function
+    
     if (selectedCourt !== "all") {
       filtered = filtered.filter((caseItem) =>
         caseItem.court.toLowerCase().includes(selectedCourt.toLowerCase())
@@ -595,17 +588,8 @@ export function CaseLawsDashboard() {
       );
     }
 
-    if (selectedYear !== "all") {
-      filtered = filtered.filter(
-        (caseItem) =>
-          new Date(caseItem.date).getFullYear().toString() === selectedYear
-      );
-    }
-    if (selectedSection !== "all") {
-      filtered = filtered.filter((caseItem) =>
-        caseItem.relevantSections.includes(selectedSection)
-      );
-    }
+    // Year and Section are now handled server-side
+    // This makes the UI more responsive
 
     setFilteredCases(filtered);
   };
@@ -622,7 +606,14 @@ export function CaseLawsDashboard() {
         sortOrder: 'desc'
       });
       
+      // Add tax section filter if selected
+      if (selectedSection !== 'all') {
+        queryParams.append('taxSection', selectedSection);
+        console.log("🔍 Filtering by tax section:", selectedSection);
+      }
+      
       // Fetch data from our API endpoint
+      console.log("🚀 Sending request with params:", queryParams.toString());
       const response = await fetch(`/api/case-laws?${queryParams.toString()}`);
       const data = await response.json();
 
@@ -636,6 +627,13 @@ export function CaseLawsDashboard() {
       const mappedCases = data.data.map((item: any) => {
         const cleanHeadline = item.headline?.replace(/<[^>]+>/g, "") ?? "";
         const cleanTitle = item.title?.replace(/<[^>]+>/g, "") ?? "";
+        
+        console.log("API item:", {
+          id: item.id,
+          tid: item.tid,
+          taxSection: item.taxSection
+        });
+        
         return {
           id: item.id || item.tid?.toString(),
           title: cleanTitle,
@@ -654,6 +652,7 @@ export function CaseLawsDashboard() {
           keywords: [],
           legalPoints: [],
           url: `https://indiankanoon.org/doc/${item.tid}`,
+          taxSection: item.taxSection || null,
         };
       });
 
@@ -970,16 +969,183 @@ export function CaseLawsDashboard() {
 
                     <Select
                       value={selectedSection}
-                      onValueChange={setSelectedSection}
+                      onValueChange={(value) => {
+                        // CRITICAL: Capture the selected value in local variable to prevent closure issues
+                        const selectedTaxSection = value;
+                        
+                        // Show loading indicator
+                        setLoading(true);
+                        
+                        // First clear the cache to ensure we get fresh data
+                        clearCache();
+                        
+                        // Reset pagination and current page
+                        setCurrentPage(1);
+                        setTotalPages(1); // Reset total pages to ensure UI updates immediately
+                        
+                        // Update the selected section
+                        setSelectedSection(selectedTaxSection);
+                        
+                        // Enhanced debugging
+                        console.log("🔍 Tax Section Filter Changed:");
+                        console.log(`   - Selected: ${selectedTaxSection}`);
+                        console.log(`   - Category: ${selectedCategory}`);
+                        console.log(`   - Year: ${selectedYear}`);
+                        
+                        // Directly make the API call with the new section filter
+                        // Don't wait for state updates to avoid timing issues
+                        const queryParams = new URLSearchParams({
+                          page: '1',
+                          limit: '20',
+                          sortBy: 'date',
+                          sortOrder: 'desc'
+                        });
+                        
+                        // Add necessary filters
+                        if (selectedCategory !== "all") {
+                          queryParams.append('category', selectedCategory);
+                        }
+                        
+                        if (selectedYear !== "all") {
+                          queryParams.append('year', selectedYear);
+                        }
+                        
+                        // IMPORTANT: Always use the local selectedTaxSection variable, not the state variable
+                        // Add the tax section filter if it's not "all"
+                        if (selectedTaxSection !== "all") {
+                          queryParams.append('taxSection', selectedTaxSection);
+                          console.log(`🔎 IMPORTANT: Filtering by taxSection=${selectedTaxSection}`);
+                          
+                          // Add visual indicator for debugging
+                          
+                        }
+                        
+                        // Execute the filtered fetch
+                        const apiUrl = `/api/case-laws?${queryParams.toString()}`;
+                        console.log(`📊 Making API request: ${apiUrl}`);
+                        
+                        fetch(apiUrl)
+                          .then(response => {
+                            if (!response.ok) {
+                              throw new Error(`API responded with status ${response.status}`);
+                            }
+                            return response.json();
+                          })
+                          .then(data => {
+                            if (data.success && Array.isArray(data.data)) {
+                              const resultCount = data.data.length;
+                              console.log(`✅ Received ${resultCount} cases with section ${selectedTaxSection}`);
+                              
+                              // No results warning
+                              if (resultCount === 0 && selectedTaxSection !== "all") {
+                              
+                                
+                                console.log(`⚠️ WARNING: No cases found with tax section ${selectedTaxSection}`);
+                                console.log("   This likely means no cases in your database have this tax section assigned.");
+                                console.log("   Run the enhanced-tax-sections.js script to analyze and assign tax sections.");
+                              }
+                              
+                              // Check if any of the results have the correct taxSection
+                              const withTaxSection = data.data.filter(item => item.taxSection === selectedTaxSection);
+                              console.log(`📋 Cases with exact taxSection=${selectedTaxSection}: ${withTaxSection.length}/${data.data.length}`);
+                              
+                              // Show a sample of the returned data for debugging
+                              if (data.data.length > 0) {
+                                const sample = data.data[0];
+                                console.log("📝 Sample case:", {
+                                  id: sample.id, 
+                                  tid: sample.tid,
+                                  title: sample.title?.substring(0, 50),
+                                  taxSection: sample.taxSection,
+                                  category: sample.category
+                                });
+                              }
+                              
+                              // Map API results to our CaseData format
+                              const mappedCases = data.data.map((item: any) => {
+                                const cleanHeadline = item.headline?.replace(/<[^>]+>/g, "") ?? "";
+                                const cleanTitle = item.title?.replace(/<[^>]+>/g, "") ?? "";
+                                
+                                return {
+                                  id: item.id || item.tid?.toString(),
+                                  title: cleanTitle,
+                                  court: item.docsource ?? "Unknown",
+                                  date: item.publishdate ?? "",
+                                  bench: item.bench ?? "",
+                                  category: (item.category ? item.category.toString() : categorizeSource(item.docsource ?? "")) as "ITAT" | "GST" | "INCOME_TAX" | "HIGH_COURT" | "SUPREME_COURT" | "TRIBUNAL_COURT",
+                                  outcome: "allowed" as "allowed",
+                                  parties: {
+                                    appellant: "",
+                                    respondent: "",
+                                  },
+                                  caseNumber: `${item.tid}`,
+                                  summary: cleanHeadline,
+                                  relevantSections: [],
+                                  keywords: [],
+                                  legalPoints: [],
+                                  url: `https://indiankanoon.org/doc/${item.tid}`,
+                                  taxSection: item.taxSection || null,
+                                };
+                              });
+                              
+                              // Update the UI with filtered cases
+                              setCases(mappedCases);
+                              setFilteredCases(mappedCases);
+                              
+                              // Update pagination
+                              setTotalPages(Math.ceil(data.total / 20) || 1);
+                            } else {
+                              // Handle empty results
+                              setCases([]);
+                              setFilteredCases([]);
+                              console.log("No cases found with section:", selectedTaxSection);
+                            }
+                            setLoading(false);
+                          })
+                          .catch(error => {
+                            console.error("Error fetching filtered cases:", error);
+                            setLoading(false);
+                            toast({
+                              title: "Error",
+                              description: "Failed to load cases with the selected filter",
+                              variant: "destructive"
+                            });
+                          });
+                      }}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Section" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Sections</SelectItem>
-                        <SelectItem value="section_1">Section 1</SelectItem>
-                        <SelectItem value="section_2">Section 2</SelectItem>
-                        <SelectItem value="section_3">Section 3</SelectItem>
+                        
+                        {/* GST Act Sections */}
+                        <SelectItem value="SECTION_7_GST">Section 7 (CGST Act): Supply</SelectItem>
+                        <SelectItem value="SECTION_16_GST">Section 16: Input Tax Credit</SelectItem>
+                        <SelectItem value="SECTION_17_GST">Section 17: Apportionment of Credit</SelectItem>
+                        <SelectItem value="SECTION_22_24_GST">Section 22-24: Registration</SelectItem>
+                        <SelectItem value="SECTION_31_GST">Section 31: Tax Invoice</SelectItem>
+                        <SelectItem value="SECTION_35_36_GST">Section 35-36: Accounts & Records</SelectItem>
+                        <SelectItem value="SECTION_37_39_GST">Section 37-39: GST Returns</SelectItem>
+                        <SelectItem value="SECTION_49_GST">Section 49: Payment of Tax</SelectItem>
+                        <SelectItem value="SECTION_54_GST">Section 54: Refunds</SelectItem>
+                        <SelectItem value="SECTION_73_74_GST">Section 73-74: Tax Determination</SelectItem>
+                        <SelectItem value="SECTION_122_GST">Section 122: Penalties</SelectItem>
+                        <SelectItem value="SECTION_129_GST">Section 129: Detention of goods</SelectItem>
+                        <SelectItem value="SECTION_140_GST">Section 140: Transitional Provisions</SelectItem>
+                        
+                        {/* Income Tax Act Sections */}
+                        <SelectItem value="SECTION_2_IT">Section 2: Definitions</SelectItem>
+                        <SelectItem value="SECTION_10_IT">Section 10: Exempt Income</SelectItem>
+                        <SelectItem value="SECTION_14_IT">Section 14: Heads of Income</SelectItem>
+                        <SelectItem value="SECTION_15_17_IT">Section 15-17: Salary Income</SelectItem>
+                        <SelectItem value="SECTION_28_44_IT">Section 28-44: Business Profits</SelectItem>
+                        <SelectItem value="SECTION_80C_80U_IT">Section 80C-80U: Deductions</SelectItem>
+                        <SelectItem value="SECTION_139_IT">Section 139: Return Filing</SelectItem>
+                        <SelectItem value="SECTION_143_IT">Section 143: Assessment</SelectItem>
+                        <SelectItem value="SECTION_147_IT">Section 147: Escaped Income</SelectItem>
+                        <SelectItem value="SECTION_194_206_IT">Section 194-206: TDS</SelectItem>
+                        <SelectItem value="SECTION_234_IT">Section 234A/B/C: Interest</SelectItem>
                       </SelectContent>
                     </Select>
 

@@ -11,16 +11,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get category from query parameters or request body
+    // Get parameters from query parameters
     const { searchParams } = new URL(request.url);
+    
+    // Get category or tax section - prioritize tax section if both are provided
     const category = searchParams.get('category');
+    const taxSection = searchParams.get('section');
+    
+    // Determine which parameter to use
+    const syncTarget = taxSection || category;
 
     console.log('🔧 Manual sync triggered via API');
-    if (category) {
+    if (taxSection) {
+      console.log(`🎯 Targeting tax section: ${taxSection}`);
+    } else if (category) {
       console.log(`🎯 Targeting category: ${category}`);
     }
     
-    const result = await runManualSync(category || undefined);
+    const result = await runManualSync(syncTarget || undefined);
     
     return NextResponse.json({ 
       success: true, 
@@ -40,13 +48,17 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category');
+    const taxSection = searchParams.get('section');
     const showAll = searchParams.get('all') === 'true';
+
+    // Determine which parameter to use
+    const statusTarget = taxSection || category;
 
     let status;
     if (showAll) {
       status = await getAllCategoriesStatus();
     } else {
-      status = await getSyncStatus(category || undefined);
+      status = await getSyncStatus(statusTarget || undefined);
     }
     
     return NextResponse.json({

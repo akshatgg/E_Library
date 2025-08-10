@@ -27,8 +27,9 @@ model CaseLaw {
   publishdate String   @map("publish_date")
   title       String   @db.Text // Can contain HTML formatting
   
-  // Additional category field for mapping docsource to category
+  // Category and tax section fields
   category    CaseCategory? // Will be populated based on docsource mapping
+  taxSection  TaxSection?   // Combined tax section reference (both GST and Income Tax)
   
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
@@ -40,6 +41,7 @@ model CaseLaw {
   @@index([category])
   @@index([publishdate])
   @@index([docsource])
+  @@index([taxSection])
   @@map("case_laws")
 }
 
@@ -80,4 +82,35 @@ enum CaseCategory {
   HIGH_COURT      @map("High Court")
   SUPREME_COURT   @map("Supreme court")
   TRIBUNAL_COURT  @map("tribunal court")
+}
+
+// Combined enum for all tax sections
+enum TaxSection {
+  // GST Act sections
+  SECTION_7_GST      @map("section_7_gst")      // Supply
+  SECTION_16_GST     @map("section_16_gst")     // Input Tax Credit
+  SECTION_17_GST     @map("section_17_gst")     // Apportionment of Credit
+  SECTION_22_24_GST  @map("section_22_24_gst")  // Registration
+  SECTION_31_GST     @map("section_31_gst")     // Tax Invoice
+  SECTION_35_36_GST  @map("section_35_36_gst")  // Accounts & Records
+  SECTION_37_39_GST  @map("section_37_39_gst")  // GST Returns
+  SECTION_49_GST     @map("section_49_gst")     // Payment of Tax
+  SECTION_54_GST     @map("section_54_gst")     // Refunds
+  SECTION_73_74_GST  @map("section_73_74_gst")  // Tax Determination
+  SECTION_122_GST    @map("section_122_gst")    // Penalties
+  SECTION_129_GST    @map("section_129_gst")    // Detention of goods
+  SECTION_140_GST    @map("section_140_gst")    // Transitional Provisions
+
+  // Income Tax Act sections
+  SECTION_2_IT       @map("section_2_it")        // Definitions
+  SECTION_10_IT      @map("section_10_it")       // Exempt Income
+  SECTION_14_IT      @map("section_14_it")       // Heads of Income
+  SECTION_15_17_IT   @map("section_15_17_it")    // Salary Income
+  SECTION_28_44_IT   @map("section_28_44_it")    // Business Profits
+  SECTION_80C_80U_IT @map("section_80C_80U_it")  // Deductions
+  SECTION_139_IT     @map("section_139_it")      // Return Filing
+  SECTION_143_IT     @map("section_143_it")      // Assessment
+  SECTION_147_IT     @map("section_147_it")      // Escaped Income
+  SECTION_194_206_IT @map("section_194_206_it")  // TDS
+  SECTION_234_IT     @map("section_234_it")      // Interest (234A/B/C)
 }

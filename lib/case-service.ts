@@ -172,6 +172,7 @@ export async function getCaseLaws(options: {
   limit?: number
   category?: string
   year?: string
+  taxSection?: string
   searchQuery?: string
   sortBy?: 'date' | 'tid' | 'createdAt'
   sortOrder?: 'asc' | 'desc'
@@ -181,6 +182,7 @@ export async function getCaseLaws(options: {
     limit = 20,
     category,
     year,
+    taxSection,
     searchQuery,
     sortBy = 'date',
     sortOrder = 'desc'
@@ -201,6 +203,11 @@ export async function getCaseLaws(options: {
     where.publishdate = {
       contains: year
     }
+  }
+  
+  if (taxSection && taxSection !== 'all') {
+    // Filter by tax section
+    where.taxSection = taxSection
   }
   
   if (searchQuery) {

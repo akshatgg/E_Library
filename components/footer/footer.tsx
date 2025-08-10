@@ -34,33 +34,18 @@ export default function Footer() {
               <Button variant="outline" size="sm" onClick={()=> router.push("/contact")}>
                 <Phone className="w-4 h-4" />
               </Button>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={()=> router.push("/contact")}>
                 <MapPin className="w-4 h-4" />
               </Button>
             </div>
           </div>
 
           <div>
-            <h4 className="text-lg font-semibold mb-4">Platform</h4>
+            <h4 className="text-lg font-semibold mb-4">Services</h4>
             <ul className="space-y-2 text-gray-400">
               <li>
                 <Link href="/case-laws" className="hover:text-white transition-colors">
                   Case Law Search
-                </Link>
-              </li>
-              <li>
-                <Link href="/about" className="hover:text-white transition-colors">
-                  About Us
-                </Link>
-              </li>
-              <li>
-                <Link href="/privacy-policy" className="hover:text-white transition-colors">
-                  Privacy Policy
-                </Link>
-              </li>
-              <li>
-                <Link href="/terms-of-service" className="hover:text-white transition-colors">
-                  Terms of Service
                 </Link>
               </li>
               <li>
@@ -69,13 +54,13 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/valuation" className="hover:text-white transition-colors">
-                  Valuation Reports
+                <Link href="/library" className="hover:text-white transition-colors">
+                  Legal Library
                 </Link>
               </li>
               <li>
-                <Link href="/library" className="hover:text-white transition-colors">
-                  Legal Library
+                <Link href="/valuation" className="hover:text-white transition-colors">
+                  Valuation Reports
                 </Link>
               </li>
             </ul>
@@ -85,27 +70,24 @@ export default function Footer() {
             <h4 className="text-lg font-semibold mb-4">Resources</h4>
             <ul className="space-y-2 text-gray-400">
               <li>
-                <Link href="/about" className="hover:text-white transition-colors">
-                  About Us
+                <Link href="/case-laws/categories" className="hover:text-white transition-colors">
+                  Case Categories
                 </Link>
               </li>
               <li>
-                <Link href="/terms-of-service" className="hover:text-white transition-colors">
-                  Terms of Service
-                </Link>
-              </li>
-              <li>
-                <Link href="/privacy-policy" className="hover:text-white transition-colors">
-                  Privacy Policy
+                <Link href="/library" className="hover:text-white transition-colors">
+                  Document Templates
                 </Link>
               </li>
               <li>
                 <Link href="/contact" className="hover:text-white transition-colors">
-                  Contact Us
+                  Support
                 </Link>
               </li>
             </ul>
-          </div>          <div>
+          </div>
+          
+          <div>
             <h4 className="text-lg font-semibold mb-4">Company</h4>
             <ul className="space-y-2 text-gray-400">
               <li>
@@ -115,7 +97,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link href="/contact" className="hover:text-white transition-colors">
-                  Careers
+                  Contact Us
                 </Link>
               </li>
               <li>

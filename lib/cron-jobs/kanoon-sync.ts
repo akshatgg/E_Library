@@ -53,6 +53,79 @@ function getCategorySearchQuery(category: string): string {
       return "(supreme court OR SC OR apex court OR hon'ble supreme court)";
     case 'TRIBUNAL_COURT':
       return "(tribunal OR appellate tribunal OR CESTAT OR NCLAT OR NGT)";
+    // GST Act Sections
+    case 'SECTION_7_GST':
+    case 'section_7_gst': // Support both formats for backward compatibility
+      return "(section 7 CGST Act OR section 7 GST OR section 7 goods and services tax OR supply GST)";
+    case 'SECTION_16_GST':
+    case 'section_16_gst':
+      return "(section 16 CGST Act OR section 16 GST OR section 16 goods and services tax OR input tax credit)";
+    case 'SECTION_17_GST':
+      return "(section 17 CGST Act OR section 17 GST OR section 17 goods and services tax OR apportionment of credit)";
+    case 'SECTION_22_24_GST':
+    case 'section_22_24_gst':
+      return "(section 22 CGST Act OR section 23 CGST OR section 24 CGST OR registration GST)";
+    case 'SECTION_31_GST':
+    case 'section_31_gst':
+      return "(section 31 CGST Act OR section 31 GST OR tax invoice GST)";
+    case 'SECTION_35_36_GST':
+    case 'section_35_36_gst':
+      return "(section 35 CGST Act OR section 36 CGST OR accounts records GST)";
+    case 'SECTION_37_39_GST':
+    case 'section_37_39_gst':
+      return "(section 37 CGST Act OR section 38 CGST OR section 39 CGST OR GST returns)";
+    case 'SECTION_49_GST':
+    case 'section_49_gst':
+      return "(section 49 CGST Act OR section 49 GST OR payment of tax GST)";
+    case 'SECTION_54_GST':
+    case 'section_54_gst':
+      return "(section 54 CGST Act OR section 54 GST OR refund GST)";
+    case 'SECTION_73_74_GST':
+    case 'section_73_74_gst':
+      return "(section 73 CGST Act OR section 74 CGST OR tax determination GST)";
+    case 'SECTION_122_GST':
+    case 'section_122_gst':
+      return "(section 122 CGST Act OR section 122 GST OR penalties GST)";
+    case 'SECTION_129_GST':
+    case 'section_129_gst':
+      return "(section 129 CGST Act OR section 129 GST OR detention of goods GST)";
+    case 'SECTION_140_GST':
+    case 'section_140_gst':
+      return "(section 140 CGST Act OR section 140 GST OR transitional provisions GST)";
+    // Income Tax Act Sections
+    case 'SECTION_2_IT':
+    case 'section_2_it':
+      return "(section 2 income tax act OR section 2 IT Act OR definitions income tax)";
+    case 'SECTION_10_IT':
+    case 'section_10_it':
+      return "(section 10 income tax act OR section 10 IT Act OR exempt income)";
+    case 'SECTION_14_IT':
+    case 'section_14_it':
+      return "(section 14 income tax act OR section 14 IT Act OR heads of income)";
+    case 'SECTION_15_17_IT':
+    case 'section_15_17_it':
+      return "(section 15 income tax act OR section 16 IT Act OR section 17 IT Act OR salary income)";
+    case 'SECTION_28_44_IT':
+    case 'section_28_44_it':
+      return "(section 28 income tax act OR section 44 IT Act OR business profits income tax)";
+    case 'SECTION_80C_80U_IT':
+    case 'section_80C_80U_it':
+      return "(section 80C income tax act OR section 80D IT Act OR section 80G OR deductions income tax)";
+    case 'SECTION_139_IT':
+    case 'section_139_it':
+      return "(section 139 income tax act OR section 139 IT Act OR return filing income tax)";
+    case 'SECTION_143_IT':
+    case 'section_143_it':
+      return "(section 143 income tax act OR section 143 IT Act OR assessment income tax)";
+    case 'SECTION_147_IT':
+    case 'section_147_it':
+      return "(section 147 income tax act OR section 147 IT Act OR escaped income)";
+    case 'SECTION_194_206_IT':
+    case 'section_194_206_it':
+      return "(section 194 income tax act OR section 206 IT Act OR TDS income tax)";
+    case 'SECTION_234_IT':
+    case 'section_234_it':
+      return "(section 234A income tax act OR section 234B IT Act OR section 234C OR interest income tax)";
     default:
       return "(income tax appellate tribunal OR ITAT OR GST OR supreme court OR high court)";
   }
@@ -84,18 +157,66 @@ function mapDocSourceToCategory(docsource: string): string | null {
   return null; // Default to null if no match
 }
 
-async function syncKanoonData(targetCategory?: string) {
+// Helper function to check if the input is a tax section
+function isTaxSection(input: string): boolean {
+  return input.startsWith('section_') || input.startsWith('SECTION_');
+}
+
+// Helper function to identify tax section and its related category
+function getTaxSectionInfo(sectionCode: string): { section: string | null, category: string | null } {
+  // Default values
+  let section = null;
+  let category = null;
+  
+  // Check if it's a valid tax section code
+  if (isTaxSection(sectionCode)) {
+    // Always convert to uppercase for consistency with Prisma enum
+    const upperCode = sectionCode.toUpperCase();
+    
+    // Check for GST sections
+    if (upperCode.endsWith('_GST')) {
+      section = upperCode;
+      category = 'GST';
+    } 
+    // Check for Income Tax sections
+    else if (upperCode.endsWith('_IT')) {
+      section = upperCode;
+      category = 'INCOME_TAX';
+    } 
+    // Fallback for any other format
+    else {
+      section = upperCode;
+    }
+  }
+  
+  console.log(`Tax section mapping: "${sectionCode}" → "${section}" (category: "${category}")`);
+  return { section, category };
+}
+
+async function syncKanoonData(targetInput?: string) {
   try {
     console.log('🔄 Starting Kanoon data sync...');
     console.log('📅 Sync time:', new Date().toISOString());
     
     let searchQuery: string;
     let categoryFilter: string | null = null;
+    let taxSectionFilter: string | null = null;
     
-    if (targetCategory) {
-      searchQuery = getCategorySearchQuery(targetCategory);
-      categoryFilter = targetCategory;
-      console.log(`🎯 Syncing specific category: ${targetCategory}`);
+    if (targetInput) {
+      searchQuery = getCategorySearchQuery(targetInput);
+      
+      // Check if it's a tax section
+      if (isTaxSection(targetInput)) {
+        const { section, category } = getTaxSectionInfo(targetInput);
+        taxSectionFilter = section;
+        categoryFilter = category; // Also set the associated category
+        
+        console.log(`🎯 Syncing specific tax section: ${taxSectionFilter} (Category: ${categoryFilter})`);
+      } else {
+        categoryFilter = targetInput;
+        console.log(`🎯 Syncing specific category: ${categoryFilter}`);
+      }
+      
       console.log(`🔍 Using search query: ${searchQuery}`);
     } else {
       // Default search for all categories
@@ -105,7 +226,7 @@ async function syncKanoonData(targetCategory?: string) {
     
     // Fetch cases from pages 1 to 5 for comprehensive data
     const allCases: IKanoonResult[] = [];
-    const pagesToFetch = [1,2,3,4,5,6,7,8,9,10]; // Fetching first 10 pages for better coverage
+    const pagesToFetch = [4]; // Fetching first 10 pages for better coverage
 
     for (const pageNum of pagesToFetch) {
       try {
@@ -149,12 +270,17 @@ async function syncKanoonData(targetCategory?: string) {
         // Map docsource to category
         const detectedCategory = mapDocSourceToCategory(caseData.docsource);
         
-        // Determine final category
+        // Determine final category and tax section
         let finalCategory: string | null;
+        let finalTaxSection: string | null = null;
         
-        if (categoryFilter) {
-          // When targeting a specific category, save all returned cases with that category
-          // This ensures we get the cases we searched for
+        if (taxSectionFilter) {
+          // When targeting a specific tax section, set both the tax section and its associated category
+          finalTaxSection = taxSectionFilter;
+          finalCategory = categoryFilter || detectedCategory; // Use the associated category, or detected if not available
+          console.log(`✅ Processing TID: ${caseData.tid} - Assigning tax section: ${finalTaxSection}, category: ${finalCategory}`);
+        } else if (categoryFilter) {
+          // When targeting a specific category only, set the category
           finalCategory = categoryFilter;
           console.log(`✅ Processing TID: ${caseData.tid} - Assigning target category: ${finalCategory} (detected: ${detectedCategory})`);
         } else {
@@ -179,6 +305,7 @@ async function syncKanoonData(targetCategory?: string) {
           publishdate: caseData.publishdate,
           title: caseData.title,
           category: finalCategory as any,
+          taxSection: finalTaxSection as any, // Add the tax section field
         };
 
         // Create or update CaseLaw
@@ -265,12 +392,17 @@ async function syncKanoonData(targetCategory?: string) {
 
       } catch (error) {
         console.error(`❌ Error processing case TID ${caseData.tid}:`, error);
+        if (error instanceof Error) {
+          console.error(`Error details: ${error.message}`);
+          console.error(`Stack trace: ${error.stack}`);
+        }
         errors++;
       }
     }
 
     const summary = {
-      category: targetCategory || 'ALL',
+      category: categoryFilter || 'ALL',
+      taxSection: taxSectionFilter || null,
       searchQuery: searchQuery,
       newCaseLaws: newCases,
       updatedCaseLaws: updatedCases,
