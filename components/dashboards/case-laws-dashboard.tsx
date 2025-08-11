@@ -111,19 +111,18 @@ export function CaseLawsDashboard() {
     new Map()
   );
 
-  const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
+  const CACHE_DURATION = 24 * 60 * 60 * 1000; // Increase cache to 24 hours for better performance
 
   const maxButtons = 10;
   const startPage = Math.floor((currentPage - 1) / maxButtons) * maxButtons + 1;
 
-  // Helper function to generate cache key - updated to include tax section
+  // Helper function to generate cache key
   const generateCacheKey = (
     page: number,
     category: string,
-    year: string,
-    section: string = "all" // Add section parameter with default value
+    year: string
   ): string => {
-    return `${page}-${category}-${year}-${section}`;
+    return `${page}-${category}-${year}`;
   };
 
   // Helper function to generate category count cache key
@@ -143,19 +142,18 @@ export function CaseLawsDashboard() {
     return Date.now() - entry.timestamp < CACHE_DURATION;
   };
 
-  // Helper function to get data from cache - updated to include tax section
+  // Helper function to get data from cache
   const getCachedData = (
     page: number,
     category: string,
-    year: string,
-    section: string = "all" // Add section parameter with default value
+    year: string
   ): CaseData[] | null => {
-    const cacheKey = generateCacheKey(page, category, year, section);
+    const cacheKey = generateCacheKey(page, category, year);
     const cachedEntry = cacheRef.current.get(cacheKey);
 
     if (cachedEntry && isCacheValid(cachedEntry)) {
       console.log(
-        `Cache hit for page ${page}, category ${category}, year ${year}, section ${section}`
+        `Cache hit for page ${page}, category ${category}, year ${year}`
       );
       return cachedEntry.data;
     }
@@ -191,22 +189,21 @@ export function CaseLawsDashboard() {
     return null;
   };
 
-  // Helper function to set data in cache - updated to include tax section
+  // Helper function to set data in cache
   const setCachedData = (
     page: number,
     category: string,
     year: string,
-    data: CaseData[],
-    section: string = "all" // Add section parameter with default value
+    data: CaseData[]
   ): void => {
-    const cacheKey = generateCacheKey(page, category, year, section);
+    const cacheKey = generateCacheKey(page, category, year);
     const cacheEntry: CacheEntry = {
       data: data,
       timestamp: Date.now(),
     };
     cacheRef.current.set(cacheKey, cacheEntry);
     console.log(
-      `Data cached for page ${page}, category ${category}, year ${year}, section ${section}`
+      `Data cached for page ${page}, category ${category}, year ${year}`
     );
   };
 
@@ -399,12 +396,11 @@ export function CaseLawsDashboard() {
     // The filter change effect will handle data loading
     const loadData = async () => {
       try {
-        // Check cache first - include selectedSection in cache key
+        // Check cache first
         const cachedData = getCachedData(
           currentPage,
           selectedCategory,
-          selectedYear,
-          selectedSection
+          selectedYear
         );
         if (cachedData) {
           setCases(cachedData);
@@ -428,12 +424,6 @@ export function CaseLawsDashboard() {
 
         if (selectedYear && selectedYear !== 'all') {
           queryParams.append('year', selectedYear);
-        }
-        
-        // IMPORTANT: Include the selected tax section in page navigation
-        if (selectedSection && selectedSection !== 'all') {
-          queryParams.append('taxSection', selectedSection);
-          console.log(`📄 Page ${currentPage}: Including tax section filter: ${selectedSection}`);
         }
         
         // Fetch data from our API endpoint
@@ -470,12 +460,11 @@ export function CaseLawsDashboard() {
             keywords: [],
             legalPoints: [],
             url: `https://indiankanoon.org/doc/${item.tid}`,
-            taxSection: item.taxSection || null, // Include the taxSection from the API response
           };
         });
 
-        // Cache the data - include selectedSection in cache key
-        setCachedData(currentPage, selectedCategory, selectedYear, mappedCases, selectedSection);
+        // Cache the data
+        setCachedData(currentPage, selectedCategory, selectedYear, mappedCases);
 
         setCases(mappedCases);
         setFilteredCases(mappedCases);
@@ -500,7 +489,7 @@ export function CaseLawsDashboard() {
     };
 
     loadData();
-  }, [currentPage, selectedCategory, selectedYear, selectedSection]);
+  }, [currentPage, selectedCategory, selectedYear]);
 
   // This effect has been replaced with direct handlers in the Select components
   // to ensure immediate UI updates
@@ -545,45 +534,22 @@ export function CaseLawsDashboard() {
   // };
 
   const handlePreviousPage = () => {
-    // When navigating pages, preserve all current filters including selectedSection
     setCurrentPage((prev) => Math.max(prev - 1, 1));
-    console.log(`⬅️ Moving to previous page with selectedSection=${selectedSection}`);
   };
 
   const handleNextPage = () => {
-    // When navigating pages, preserve all current filters including selectedSection
     if (currentPage < totalPages) {
       setCurrentPage((prev) => prev + 1);
-      console.log(`➡️ Moving to next page with selectedSection=${selectedSection}`);
     }
   };
   
   const handlePageChange = (page: number) => {
-    // When navigating to a specific page, preserve all current filters including selectedSection
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
-      console.log(`🔢 Moving to page ${page} with selectedSection=${selectedSection}`);
     }
   };
-  useEffect(() => {
-    // Only run client-side filtering for specific filters that don't trigger a server request
-    if (cases.length > 0) {
-      filterCases();
-    }
-  }, [
-    // We now handle these server-side, so they don't need to trigger client-side filtering
-    // selectedCategory, 
-    // selectedYear,
-    // selectedSection,
-    
-    // Keep these for client-side filtering
-    selectedCourt,
-    selectedOutcome,
-    cases,
-  ]);
-
-  const filterCases = () => {
-    // Skip expensive filtering if no client-side filters are active
+  // Optimize client-side filtering with useCallback
+  const filterCasesCallback = useCallback(() => {
     if (selectedCourt === "all" && selectedOutcome === "all") {
       setFilteredCases(cases);
       return;
@@ -591,8 +557,6 @@ export function CaseLawsDashboard() {
     
     let filtered = [...cases];
 
-    // Search query is now handled server-side through the searchCases function
-    
     if (selectedCourt !== "all") {
       filtered = filtered.filter((caseItem) =>
         caseItem.court.toLowerCase().includes(selectedCourt.toLowerCase())
@@ -605,11 +569,17 @@ export function CaseLawsDashboard() {
       );
     }
 
-    // Year and Section are now handled server-side
-    // This makes the UI more responsive
-
     setFilteredCases(filtered);
-  };
+  }, [cases, selectedCourt, selectedOutcome]);
+  
+  // Use memoized filtering function
+  useEffect(() => {
+    if (cases.length > 0) {
+      filterCasesCallback();
+    }
+  }, [filterCasesCallback]);
+
+  // This function has been replaced by the memoized filterCasesCallback above
 
   const searchCases = async (query: string) => {
     setLoading(true);
@@ -1063,7 +1033,7 @@ export function CaseLawsDashboard() {
                               }
                               
                               // Check if any of the results have the correct taxSection
-                              const withTaxSection = data.data.filter(item => item.taxSection === selectedTaxSection);
+                              const withTaxSection = data.data.filter((item: any) => item.taxSection === selectedTaxSection);
                               console.log(`📋 Cases with exact taxSection=${selectedTaxSection}: ${withTaxSection.length}/${data.data.length}`);
                               
                               // Show a sample of the returned data for debugging

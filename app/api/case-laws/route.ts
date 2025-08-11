@@ -20,29 +20,20 @@ export async function GET(req: NextRequest) {
   });
 
   try {
-    // Enhanced debugging for tax section filtering
-    if (taxSection && taxSection !== 'all') {
-      console.log(`
-🔍 TAX SECTION FILTER DETAILS:
-   - Filtering by: ${taxSection}
-   - Category: ${category || 'all'}
-   - Year: ${year || 'all'}
-      `);
-      
-      // Check if we have any cases with this tax section in the database
+    // Skip expensive debug counts in production
+    if (taxSection && taxSection !== 'all' && process.env.NODE_ENV === 'development') {
+      console.log(`Filtering by taxSection: ${taxSection}`);
+      // Only run expensive counts in development
+      /*
       const prisma = await import('@/lib/prisma').then(mod => mod.prisma);
       const taxSectionCount = await prisma.caseLaw.count({
         where: {
-          taxSection: taxSection as any // Type assertion to fix type error
+          taxSection: taxSection as any
         }
       });
       
-      console.log(`📊 Database has ${taxSectionCount} cases with taxSection=${taxSection}`);
-      
-      if (taxSectionCount === 0) {
-        console.log(`⚠️ WARNING: No cases found in database with taxSection=${taxSection}`);
-        console.log('   Consider running the enhanced-tax-sections.js script to populate tax sections.');
-      }
+      console.log(`Database has ${taxSectionCount} cases with taxSection=${taxSection}`);
+      */
     }
     
     // Use the getCaseLaws function that accesses Prisma
@@ -60,30 +51,20 @@ export async function GET(req: NextRequest) {
     
     console.log(`✅ Database query complete. Found ${result.cases.length} cases out of total ${result.total}`);
     
-    // Check if we're filtering by tax section and got expected results
-    if (taxSection && taxSection !== 'all') {
-      const casesWithCorrectSection = result.cases.filter(c => c.taxSection === taxSection).length;
-      console.log(`
-📊 TAX SECTION FILTER RESULTS:
-   - Requested section: ${taxSection}
-   - Total cases returned: ${result.cases.length}
-   - Cases with exact matching taxSection: ${casesWithCorrectSection}
-   - Match percentage: ${result.cases.length > 0 ? Math.round((casesWithCorrectSection / result.cases.length) * 100) : 0}%
-      `);
-    }
-    
-    // Log the first case to see its structure
-    if (result.cases.length > 0) {
-      const firstCase = result.cases[0];
-      console.log('📝 Sample case from results:', {
-        id: firstCase.id,
-        tid: firstCase.tid,
-        category: firstCase.category,
-        taxSection: firstCase.taxSection,
-        title: firstCase.title?.substring(0, 50) + '...'
-      });
-    } else if (taxSection && taxSection !== 'all') {
-      console.log(`⚠️ No cases returned when filtering by taxSection=${taxSection}`);
+    // Skip expensive filtering and verbose logging in production
+    if (process.env.NODE_ENV === 'development') {
+      // Only in development - check if we're filtering by tax section
+      if (taxSection && taxSection !== 'all') {
+        // Only sample first 5 cases instead of filtering entire result set
+        const sampleSize = Math.min(5, result.cases.length);
+        const sampleCases = result.cases.slice(0, sampleSize);
+        const withMatchingSection = sampleCases.filter(c => c.taxSection === taxSection).length;
+        
+        console.log(`Sample: ${withMatchingSection}/${sampleSize} cases match taxSection=${taxSection}`);
+      }
+    } else {
+      // In production, just log minimal info
+      console.log(`Found ${result.cases.length} of ${result.total} cases`);
     }
 
     return NextResponse.json({ 

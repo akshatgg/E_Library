@@ -218,7 +218,7 @@ export async function getCaseLaws(options: {
     ]
   }
   
-  // Get cases with pagination
+  // Get cases with pagination - optimize query
   const [cases, total] = await Promise.all([
     prisma.caseLaw.findMany({
       where,
@@ -228,7 +228,18 @@ export async function getCaseLaws(options: {
         // Use appropriate field names for sorting
         [sortBy === 'date' ? 'publishdate' : sortBy]: sortOrder
       },
-      include: {
+      select: {
+        // Only select fields we actually use to reduce data transfer
+        id: true,
+        tid: true,
+        title: true,
+        headline: true,
+        publishdate: true,
+        docsource: true,
+        bench: true,
+        category: true,
+        taxSection: true,
+        // Include minimal case detail fields
         caseDetail: {
           select: {
             numcitedby: true,
