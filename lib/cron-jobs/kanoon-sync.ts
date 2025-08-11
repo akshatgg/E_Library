@@ -226,7 +226,7 @@ async function syncKanoonData(targetInput?: string) {
     
     // Fetch cases from pages 1 to 5 for comprehensive data
     const allCases: IKanoonResult[] = [];
-    const pagesToFetch = [4]; // Fetching first 10 pages for better coverage
+    const pagesToFetch = [3]; // Fetching first 10 pages for better coverage
 
     for (const pageNum of pagesToFetch) {
       try {

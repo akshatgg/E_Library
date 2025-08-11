@@ -116,13 +116,14 @@ export function CaseLawsDashboard() {
   const maxButtons = 10;
   const startPage = Math.floor((currentPage - 1) / maxButtons) * maxButtons + 1;
 
-  // Helper function to generate cache key
+  // Helper function to generate cache key - updated to include tax section
   const generateCacheKey = (
     page: number,
     category: string,
-    year: string
+    year: string,
+    section: string = "all" // Add section parameter with default value
   ): string => {
-    return `${page}-${category}-${year}`;
+    return `${page}-${category}-${year}-${section}`;
   };
 
   // Helper function to generate category count cache key
@@ -142,18 +143,19 @@ export function CaseLawsDashboard() {
     return Date.now() - entry.timestamp < CACHE_DURATION;
   };
 
-  // Helper function to get data from cache
+  // Helper function to get data from cache - updated to include tax section
   const getCachedData = (
     page: number,
     category: string,
-    year: string
+    year: string,
+    section: string = "all" // Add section parameter with default value
   ): CaseData[] | null => {
-    const cacheKey = generateCacheKey(page, category, year);
+    const cacheKey = generateCacheKey(page, category, year, section);
     const cachedEntry = cacheRef.current.get(cacheKey);
 
     if (cachedEntry && isCacheValid(cachedEntry)) {
       console.log(
-        `Cache hit for page ${page}, category ${category}, year ${year}`
+        `Cache hit for page ${page}, category ${category}, year ${year}, section ${section}`
       );
       return cachedEntry.data;
     }
@@ -189,21 +191,22 @@ export function CaseLawsDashboard() {
     return null;
   };
 
-  // Helper function to set data in cache
+  // Helper function to set data in cache - updated to include tax section
   const setCachedData = (
     page: number,
     category: string,
     year: string,
-    data: CaseData[]
+    data: CaseData[],
+    section: string = "all" // Add section parameter with default value
   ): void => {
-    const cacheKey = generateCacheKey(page, category, year);
+    const cacheKey = generateCacheKey(page, category, year, section);
     const cacheEntry: CacheEntry = {
       data: data,
       timestamp: Date.now(),
     };
     cacheRef.current.set(cacheKey, cacheEntry);
     console.log(
-      `Data cached for page ${page}, category ${category}, year ${year}`
+      `Data cached for page ${page}, category ${category}, year ${year}, section ${section}`
     );
   };
 
@@ -396,11 +399,12 @@ export function CaseLawsDashboard() {
     // The filter change effect will handle data loading
     const loadData = async () => {
       try {
-        // Check cache first
+        // Check cache first - include selectedSection in cache key
         const cachedData = getCachedData(
           currentPage,
           selectedCategory,
-          selectedYear
+          selectedYear,
+          selectedSection
         );
         if (cachedData) {
           setCases(cachedData);
@@ -424,6 +428,12 @@ export function CaseLawsDashboard() {
 
         if (selectedYear && selectedYear !== 'all') {
           queryParams.append('year', selectedYear);
+        }
+        
+        // IMPORTANT: Include the selected tax section in page navigation
+        if (selectedSection && selectedSection !== 'all') {
+          queryParams.append('taxSection', selectedSection);
+          console.log(`📄 Page ${currentPage}: Including tax section filter: ${selectedSection}`);
         }
         
         // Fetch data from our API endpoint
@@ -460,11 +470,12 @@ export function CaseLawsDashboard() {
             keywords: [],
             legalPoints: [],
             url: `https://indiankanoon.org/doc/${item.tid}`,
+            taxSection: item.taxSection || null, // Include the taxSection from the API response
           };
         });
 
-        // Cache the data
-        setCachedData(currentPage, selectedCategory, selectedYear, mappedCases);
+        // Cache the data - include selectedSection in cache key
+        setCachedData(currentPage, selectedCategory, selectedYear, mappedCases, selectedSection);
 
         setCases(mappedCases);
         setFilteredCases(mappedCases);
@@ -489,7 +500,7 @@ export function CaseLawsDashboard() {
     };
 
     loadData();
-  }, [currentPage, selectedCategory, selectedYear]);
+  }, [currentPage, selectedCategory, selectedYear, selectedSection]);
 
   // This effect has been replaced with direct handlers in the Select components
   // to ensure immediate UI updates
@@ -534,18 +545,24 @@ export function CaseLawsDashboard() {
   // };
 
   const handlePreviousPage = () => {
+    // When navigating pages, preserve all current filters including selectedSection
     setCurrentPage((prev) => Math.max(prev - 1, 1));
+    console.log(`⬅️ Moving to previous page with selectedSection=${selectedSection}`);
   };
 
   const handleNextPage = () => {
+    // When navigating pages, preserve all current filters including selectedSection
     if (currentPage < totalPages) {
       setCurrentPage((prev) => prev + 1);
+      console.log(`➡️ Moving to next page with selectedSection=${selectedSection}`);
     }
   };
   
   const handlePageChange = (page: number) => {
+    // When navigating to a specific page, preserve all current filters including selectedSection
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
+      console.log(`🔢 Moving to page ${page} with selectedSection=${selectedSection}`);
     }
   };
   useEffect(() => {
