@@ -1,52 +1,40 @@
 "use client"
-import { auth,getUserDataFromFirestore  } from "@/lib/firebase";
-import Chatbot from "@/components/chatbot/index";
-import { useEffect,useState } from "react"
+import { lazy, Suspense, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
-  BookOpen,
   Search,
   FileText,
   Scale,
-  LogOut,
-  User,
-  Moon,
-  Sun,
   Zap,
   Shield,
   Globe,
   TrendingUp,
-  Mail,
-  Phone,
-  MapPin,
 } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/components/auth-provider"
-import { useTheme } from "next-themes"
-import { set } from "date-fns";
+
+// Lazy load the Chatbot component
+const Chatbot = lazy(() => import("@/components/chatbot/index"));
 
 export default function HomePage() {
-  const { user, isAuthenticated, isLoading, signOut } = useAuth()
-
-
+  const { isAuthenticated, loading } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    // Only redirect if authentication has been checked and user isn't authenticated
+    if (!loading && !isAuthenticated) {
       router.push("/auth/signin")
     }
-  }, [isAuthenticated, isLoading, router])
-  
+  }, [isAuthenticated, loading, router])
 
-
-
-  if (isLoading) {
+  // Show a smaller, more efficient loading indicator
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-blue-600"></div>
       </div>
     )
   }
@@ -199,9 +187,11 @@ export default function HomePage() {
           </div>
         </section>
       </main>
-     <Chatbot />
-    
-     
+      
+      {/* Lazy load chatbot with suspense boundary */}
+      <Suspense fallback={null}>
+        <Chatbot />
+      </Suspense>
     </div>
   )
 }

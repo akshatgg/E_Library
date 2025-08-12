@@ -1,15 +1,16 @@
 // src/chatbot/hooks/useGeminiAPI.js
 "use client"
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 
 const useGeminiAPI = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Your Gemini API key
+  // Your Gemini API key - this should ideally be in an environment variable
   const API_KEY = "AIzaSyAMN0mS5W-UyscY9teuMvFl07ST981FcEo";
   
-  const sendMessageToGemini = async (message) => {
+  // Use useCallback to memoize this function
+  const sendMessageToGemini = useCallback(async (message) => {
     setLoading(true);
     setError(null);
     
@@ -59,7 +60,7 @@ const useGeminiAPI = () => {
       setLoading(false);
       return "Sorry, I couldn't process that request. Please try again later.";
     }
-  };
+  }, []);
 
   return {
     sendMessageToGemini,

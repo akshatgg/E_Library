@@ -1,17 +1,20 @@
 // src/chatbot/index.js
 "use client"
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import ChatIcon from './components/ChatIcon';
-import ChatWindow from './components/ChatWindow';
-import useGeminiAPI from './hooks/useGeminiAPI';
+// Only import the API hook when the chat is actually opened
 import './styles/chatbot.css';
+
+// Lazy load these components
+const ChatWindow = lazy(() => import('./components/ChatWindow'));
 
 const Chatbot = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [messages, setMessages] = useState([]);
   const chatRef = useRef(null);
-  const { sendMessageToGemini, loading } = useGeminiAPI();
+  // Only initialize the API when the chat is opened
+  const [apiHook, setApiHook] = useState(null);
 
   const toggleChat = () => {
     setIsOpen(!isOpen);
