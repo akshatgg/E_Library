@@ -2,18 +2,18 @@
 
 import { useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { AdminUsers } from "@/components/admin/admin-users"
+// import { AdminUsers } from "@/components/admin/admin-users"
 import { AdminDocuments } from "@/components/admin/admin-documents"
-import { AdminCategories } from "@/components/admin/admin-categories"
-import { AdminSettings } from "@/components/admin/admin-settings"
-import { AdminAnalytics } from "@/components/admin/admin-analytics"
-import type { UserData } from "@/lib/auth"
+// import { AdminCategories } from "@/components/admin/admin-categories"
+// import { AdminSettings } from "@/components/admin/admin-settings"
+// import { AdminAnalytics } from "@/components/admin/admin-analytics"
+// import type { UserData } from "@/lib/auth"
 
 interface AdminDashboardProps {
-  user: UserData
+  // user: UserData
 }
 
-export function AdminDashboard({ user }: AdminDashboardProps) {
+export function AdminDashboard({  }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState("documents")
 
   return (
@@ -30,7 +30,7 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
         <AdminDocuments />
       </TabsContent>
 
-      <TabsContent value="categories" className="space-y-4">
+      {/* <TabsContent value="categories" className="space-y-4">
         <AdminCategories />
       </TabsContent>
 
@@ -44,7 +44,7 @@ export function AdminDashboard({ user }: AdminDashboardProps) {
 
       <TabsContent value="settings" className="space-y-4">
         <AdminSettings />
-      </TabsContent>
+      </TabsContent> */}
     </Tabs>
   )
 }

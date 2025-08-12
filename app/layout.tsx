@@ -1,11 +1,14 @@
 import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
-import { ThemeProvider } from "next-themes"
+import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/components/auth-provider"
 import { Toaster } from "@/components/ui/toaster"
+import { HydrationFix } from "@/components/hydration-fix"
 import "./globals.css"
 import AppLayouts from "@/layouts/AppLayouts"
+// Initialize cron jobs
+import "@/lib/cron-jobs"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -22,7 +25,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
+      <body 
+        className={inter.className} 
+        suppressHydrationWarning
+      >
+        <HydrationFix />
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
           <AuthProvider>
           <AppLayouts>

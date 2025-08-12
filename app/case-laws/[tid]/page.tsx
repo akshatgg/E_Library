@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { ArrowLeft, Loader, Loader2 } from "lucide-react";
+import React, { useState, useEffect, use } from "react";
+import { ArrowLeft, ChevronDown, ChevronUp, Loader, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { getCaseDetail } from "../actions";
 
 interface CaseData {
   success: boolean;
@@ -21,6 +22,7 @@ interface CaseData {
     query_alert: any;
     agreement: boolean;
   };
+  error?: string;
 }
 import { pdf } from "@react-pdf/renderer";
 import JudgmentPDF from "@/components/pdf/JudgementPDF";
@@ -30,20 +32,150 @@ export default function CasePage({ params }: { params: { tid: string } }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
+  const [showFullJudgment, setShowFullJudgment] = useState(false);
   const router = useRouter();
   const stripHtmlTags = (html: string) => {
-  return html.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ');
-};
+    // Special handling for legal document structure
+    let text = html
+      // Proper paragraph handling
+      .replace(/<p[^>]*>/gi, '')
+      .replace(/<\/p>/gi, '\n\n')
+      // Heading handling
+      .replace(/<h1[^>]*>/gi, '\n\n')
+      .replace(/<\/h1>/gi, '\n\n')
+      .replace(/<h2[^>]*>/gi, '\n\n')
+      .replace(/<\/h2>/gi, '\n\n')
+      .replace(/<h3[^>]*>/gi, '\n\n')
+      .replace(/<\/h3>/gi, '\n\n')
+      .replace(/<h[4-6][^>]*>/gi, '\n')
+      .replace(/<\/h[4-6]>/gi, '\n')
+      // List handling for legal points
+      .replace(/<ul[^>]*>|<ol[^>]*>/gi, '\n')
+      .replace(/<\/ul>|<\/ol>/gi, '\n')
+      .replace(/<li[^>]*>/gi, '\n   • ')
+      .replace(/<\/li>/gi, '')
+      // Table handling - important for legal documents
+      .replace(/<tr[^>]*>/gi, '\n')
+      .replace(/<td[^>]*>/gi, '\t')
+      .replace(/<\/td>|<\/tr>/gi, '')
+      // Line breaks and divs
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<div[^>]*>/gi, '')
+      .replace(/<\/div>/gi, '\n')
+      // Special legal document elements
+      .replace(/<blockquote[^>]*>/gi, '\n\n"')
+      .replace(/<\/blockquote>/gi, '"\n\n')
+      // Bold and emphasis often used for case names and citations
+      .replace(/<b[^>]*>|<strong[^>]*>/gi, '')
+      .replace(/<\/b>|<\/strong>/gi, '')
+      .replace(/<i[^>]*>|<em[^>]*>/gi, '')
+      .replace(/<\/i>|<\/em>/gi, '');
+      
+    // Remove all remaining HTML tags
+    text = text.replace(/<[^>]*>?/gm, '');
+    
+    // Fix common HTML entities - legal documents have many special characters
+    text = text
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&rsquo;|&#39;/g, "'")
+      .replace(/&lsquo;/g, "'")
+      .replace(/&ldquo;|&rdquo;/g, '"')
+      .replace(/&ndash;/g, '–')
+      .replace(/&mdash;/g, '—')
+      .replace(/&sect;/g, '§')
+      .replace(/&para;/g, '¶')
+      .replace(/&reg;/g, '®')
+      .replace(/&copy;/g, '©')
+      .replace(/&trade;/g, '™');
+    
+    // Legal document specific formatting
+    text = text
+      // Format paragraph numbers and section references properly
+      .replace(/(\d+)\.(\d+)\.(\d+)/g, '$1.$2.$3 ') // Multi-level numbering
+      .replace(/(\d+)\.(\d+)/g, '$1.$2 ') // Two-level numbering
+      .replace(/(\d+)\./g, '\n$1. ') // Single-level numbering
+      .replace(/\(([ivx]+)\)/gi, '($1) ') // Roman numerals in parentheses
+      .replace(/\(([a-z])\)/g, '($1) ') // Lettered points
+      
+      // Fix spacing issues
+      .replace(/\n{3,}/g, '\n\n')  // Limit consecutive line breaks
+      .replace(/\s{2,}/g, ' ')      // Limit consecutive spaces
+      .trim(); // Remove leading/trailing whitespace
+      
+    return text;
+  };
 
 
   const handleDownloadJudgmentPDF = async () => {
   if (!caseData) return;
 
-  const textContent = stripHtmlTags(caseData.data.doc);
+  // Prepare the document for better PDF formatting
+  const prepareDocumentForPDF = (htmlContent: string) => {
+    // First extract the important text using our HTML stripper
+    let textContent = stripHtmlTags(htmlContent);
+    
+    // Legal document specific formatting
+    textContent = textContent
+      // Normalize all whitespace first
+      .replace(/\s+/g, ' ')
+      // Ensure proper spacing after punctuation
+      .replace(/\.(?=\S)/g, '. ')
+      .replace(/,(?=\S)/g, ', ')
+      .replace(/;(?=\S)/g, '; ')
+      .replace(/:(?=\S)/g, ': ')
+      // Special handling for citations
+      .replace(/\[\d+\]/g, match => ` ${match} `)
+      // Handle section and paragraph formatting
+      .replace(/(\([a-z]\)|\d+\.)(?=\S)/g, match => `\n${match} `)
+      // Handle quoted text
+      .replace(/"([^"]*)"/g, ' "$1" ')
+      // Remove any excessive spacing that might have been added
+      .replace(/\s{2,}/g, ' ');
+    
+    return textContent;
+  };
+  
+  // Process the content for PDF
+  let textContent = prepareDocumentForPDF(caseData.data.doc);
+  
+  // Extract case info
+  const extractedCaseInfo = extractCaseInfo(caseData.data.doc);
+  
+  // Generate a professional filename with court type and year
+  const courtType = caseData.data.docsource.includes('supreme') ? 'SC' : 
+                    caseData.data.docsource.includes('high') ? 'HC' : 
+                    caseData.data.docsource.includes('itat') ? 'ITAT' : 'TRIB';
+                    
+  const year = new Date(caseData.data.publishdate).getFullYear();
+  
+  // Create case name from parties or use first part of title
+  let caseName = "";
+  if (extractedCaseInfo.parties) {
+    // Extract first word from each party
+    const parties = extractedCaseInfo.parties.split(' vs ');
+    if (parties.length >= 2) {
+      caseName = `${parties[0].split(' ')[0]}_v_${parties[1].split(' ')[0]}`;
+    } else {
+      caseName = extractedCaseInfo.parties.substring(0, 20).replace(/\s+/g, '_');
+    }
+  } else {
+    // Use safe title
+    caseName = caseData.data.title
+      .replace(/[^\w\s]/gi, '')
+      .replace(/\s+/g, '_')
+      .substring(0, 30);
+  }
+  
+  const fileName = `${courtType}_${year}_${caseName}.pdf`;
+  
   const blob = await pdf(
     <JudgmentPDF
       title={caseData.data.title}
-      caseNumber={caseInfo.caseNumber || ""}
+      caseNumber={extractedCaseInfo.caseNumber || ""}
       date={formatDate(caseData.data.publishdate)}
       content={textContent}
     />
@@ -52,28 +184,34 @@ export default function CasePage({ params }: { params: { tid: string } }) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.setAttribute("download", "judgment.pdf");
+  link.setAttribute("download", fileName);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  
+  // Clean up the URL object
+  setTimeout(() => URL.revokeObjectURL(url), 100);
 };
 
 
-  const tid = parseInt(params.tid, 10);
+  // Unwrap params using use() for future Next.js compatibility
+  // This works with both current params object and future Promise-based params
+  const resolvedParams = params instanceof Promise ? use(params) : params;
+  const tid = parseInt(resolvedParams.tid, 10);
 
   useEffect(() => {
     async function fetchCase() {
       try {
         setLoading(true);
-        const response = await fetch(`/api/cases/tid?tid=${tid}`);
-        if (!response.ok) {
-          throw new Error("Failed to fetch case data");
+        const result = await getCaseDetail(tid);
+        if (result.success) {
+          setCaseData(result);
+        } else {
+          throw new Error(result.error);
         }
-        const data = await response.json();
-        setCaseData(data);
       } catch (error) {
         console.error("Error fetching case data:", error);
-        setError("Failed to load case data");
+        setError(error instanceof Error ? error.message : "Failed to load case data");
       } finally {
         setLoading(false);
       }
@@ -152,20 +290,42 @@ export default function CasePage({ params }: { params: { tid: string } }) {
 
   const cleanHtmlContent = (htmlContent: string) => {
     // Remove unwanted symbols and clean up HTML
-    return htmlContent
+    let cleaned = htmlContent
       .replace(/&lt;/g, "<")
       .replace(/&gt;/g, ">")
       .replace(/&amp;/g, "&")
       .replace(/&#x27;/g, "'")
       .replace(/&quot;/g, '"');
+    
+    // Improve paragraph formatting
+    cleaned = cleaned.replace(/<p>\s*<\/p>/g, ''); // Remove empty paragraphs
+    
+    // Add styling to improve readability
+    cleaned = cleaned.replace(/<p/g, '<p class="mb-4"');
+    cleaned = cleaned.replace(/<h(\d)/g, '<h$1 class="font-semibold text-gray-800 mb-3 mt-6"');
+    
+    // Format blockquotes properly
+    cleaned = cleaned.replace(/<blockquote/g, '<blockquote class="border-l-4 border-gray-300 pl-4 italic my-4"');
+    
+    // Add styling to lists for better readability
+    cleaned = cleaned.replace(/<ul/g, '<ul class="list-disc pl-5 my-4"');
+    cleaned = cleaned.replace(/<ol/g, '<ol class="list-decimal pl-5 my-4"');
+    cleaned = cleaned.replace(/<li/g, '<li class="mb-2"');
+    
+    return cleaned;
   };
 
   if (loading) {
     return (
-      <>
-        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-        Processing...
-      </>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="flex flex-col items-center">
+            <Loader2 className="h-12 w-12 animate-spin text-blue-600 mb-4" />
+            <h2 className="text-xl font-medium text-gray-700">Loading Case Details</h2>
+            <p className="text-gray-500 mt-2">Please wait while we retrieve the case information...</p>
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -191,6 +351,17 @@ export default function CasePage({ params }: { params: { tid: string } }) {
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="mb-4">
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => router.back()}
+              className="flex items-center text-gray-600 hover:text-gray-900"
+            >
+              <ArrowLeft className="mr-1 h-4 w-4" />
+              Back to Results
+            </Button>
+          </div>
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <h1 className="text-2xl font-bold text-gray-900 mb-2">
@@ -243,7 +414,7 @@ export default function CasePage({ params }: { params: { tid: string } }) {
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-purple-600">
-                {caseInfo.assessmentYear || "N/A"}
+                {new Date(caseData.data.publishdate).getFullYear().toString() || "N/A"}
               </div>
               <div className="text-sm text-gray-600">Assessment Year</div>
             </div>
@@ -306,7 +477,7 @@ export default function CasePage({ params }: { params: { tid: string } }) {
                       Assessment Year:
                     </span>
                     <p className="text-sm text-gray-900">
-                      {caseInfo.assessmentYear || "Not specified"}
+                      {new Date(caseData.data.publishdate).getFullYear().toString()}
                     </p>
                   </div>
                   <div>
@@ -438,12 +609,10 @@ export default function CasePage({ params }: { params: { tid: string } }) {
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-                  {caseInfo.assessmentYear && (
-                    <div className="bg-green-50 p-4 rounded-lg">
-                      <h4 className="font-semibold mb-2">Assessment Year:</h4>
-                      <p className="text-gray-700">{caseInfo.assessmentYear}</p>
-                    </div>
-                  )}
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <h4 className="font-semibold mb-2">Assessment Year:</h4>
+                    <p className="text-gray-700">{new Date(caseData.data.publishdate).getFullYear().toString()}</p>
+                  </div>
 
                   {caseInfo.caseNumber && (
                     <div className="bg-purple-50 p-4 rounded-lg">
@@ -460,22 +629,71 @@ export default function CasePage({ params }: { params: { tid: string } }) {
         {activeTab === "judgment" && (
           <div className="bg-white rounded-lg shadow">
             <div className="p-6">
-              <div className="flex justify-end">
-                <Button onClick={handleDownloadJudgmentPDF} className="mb-4">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-semibold text-gray-900">
+                  Full Judgment Text
+                </h3>
+                <Button onClick={handleDownloadJudgmentPDF} className="ml-4">
                   Download PDF
                 </Button>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-6">
-                Full Judgment Text
-              </h3>
-              <div
-                className="prose max-w-none text-sm leading-relaxed"
-                dangerouslySetInnerHTML={{ __html: cleanedContent }}
-                style={{
-                  fontFamily: "Georgia, serif",
-                  lineHeight: "1.6",
-                }}
-              />
+              <div className="mb-6 bg-gray-50 p-4 rounded-lg">
+                <h4 className="font-medium text-gray-700 mb-2">Case Information</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span className="font-medium">Title:</span> {caseData.data.title}
+                  </div>
+                  <div>
+                    <span className="font-medium">Date:</span> {formatDate(caseData.data.publishdate)}
+                  </div>
+                  <div>
+                    <span className="font-medium">Source:</span> {caseData.data.docsource}
+                  </div>
+                </div>
+              </div>
+              <div className="border-t border-gray-200 pt-6">
+                <div 
+                  className="prose prose-headings:font-semibold prose-headings:text-gray-800 
+                             prose-p:text-justify prose-p:my-4 max-w-none text-sm leading-relaxed"
+                  style={{
+                    fontFamily: "Georgia, serif",
+                    lineHeight: "1.8",
+                    color: "#333",
+                    maxHeight: showFullJudgment ? "none" : "500px",
+                    overflow: "hidden",
+                    position: "relative"
+                  }}
+                >
+                  <div dangerouslySetInnerHTML={{ __html: cleanedContent }} />
+                  {!showFullJudgment && (
+                    <div 
+                      className="absolute bottom-0 left-0 right-0 h-24" 
+                      style={{ 
+                        background: "linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,1) 100%)" 
+                      }}
+                    />
+                  )}
+                </div>
+                <div className="mt-4 text-center">
+                  <Button 
+                    variant="outline"
+                    onClick={() => setShowFullJudgment(!showFullJudgment)} 
+                    className="mx-auto flex items-center gap-2"
+                  >
+                    {showFullJudgment ? (
+                      <>
+                        <ChevronUp className="h-4 w-4" />
+                        Show Less
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="h-4 w-4" />
+                        Show Full Judgment
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         )}
