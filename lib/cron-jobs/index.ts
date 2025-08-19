@@ -16,5 +16,5 @@ export function initializeCronJobs() {
 
 // Auto-initialize when module is imported
 if (typeof window === 'undefined') { // Only run on server-side
-  initializeCronJobs();
+  // initializeCronJobs();
 }
